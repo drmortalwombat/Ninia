@@ -1,11 +1,17 @@
 #pragma once
 
-extern struct Variable
+#include "tokens.h"
+
+
+struct Variable
 {
 	unsigned	symbol;
-	long		value;
-}	globals[256];
-extern unsigned	num_globals;
+	Value		v;
+};
+
+extern __striped Variable	globals[256];
+
+extern char	num_globals;
 
 unsigned global_find(unsigned symbol);
 

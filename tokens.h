@@ -71,20 +71,39 @@
 #define TK_ARRAY			(TK_STRUCTURE + 1)
 #define TK_STRUCT			(TK_STRUCTURE + 2)
 
-
 #define TK_END				(TK_CONTROL + 0)
 #define TK_COMMA			(TK_CONTROL + 1)
+#define TK_STRING			(TK_CONTROL + 2)
 
 #define STMT_ERROR			0x01
 #define STMT_NONE			0x02
 
 #define STMT_EXPRESSION		0x10
 #define STMT_VAR			0x11
-#define STMT_FUNC			0x12
+#define STMT_DEF			0x12
 
 #define STMT_WHILE			0x20
 #define STMT_IF				0x21
 #define STMT_ELSIF			0x22
 #define STMT_ELSE			0x23
+#define STMT_RETURN			0x24
+
+#define TYPE_NULL			0x01
+#define TYPE_NUMBER			0x02
+#define TYPE_SYMBOL			0x04
+#define TYPE_FUNCTION		0x08
+#define TYPE_ARRAY			0x10
+#define TYPE_STRING			0x20
+#define TYPE_STRUCT			0x40
+
+#define TYPE_GLOBAL_REF		0x80
+#define TYPE_LOCAL_REF		0x81
+#define TYPE_ARRAY_REF		0x82
+
+struct Value
+{
+	char	type;
+	long	value;
+};
 
 #pragma compile("tokens.cpp")

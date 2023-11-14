@@ -280,6 +280,25 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 				color[si] = VCOL_MED_GREY;
 				si++;
 				break;
+			case TK_STRING:
+				{
+					stack[sp++] = si;
+					str[si] = '"';
+					color[si] = VCOL_MED_GREY;
+					si++;
+					char i = 0;
+					while (i < tk[0])
+					{
+						str[si] = tk[i + 1];
+						color[si] = VCOL_LT_BLUE;
+						si++;
+						i++;
+					}
+					str[si] = '"';
+					color[si] = VCOL_MED_GREY;
+					si++;
+					tk += i + 1;
+				} break;
 			}
 			break;
 		}
@@ -335,6 +354,12 @@ const char * format_statement(const char * tk, char * str, char * col)
 		case STMT_VAR:
 			l = format_append(str, col, l, p"VAR ");
 			return format_expression(tk, str, col, l);
+		case STMT_RETURN:
+			l = format_append(str, col, l, p"RETURN ");
+			return format_expression(tk, str, col, l);
+		case STMT_DEF:
+			l = format_append(str, col, l, p"DEF ");
+			return format_expression(tk + 2, str, col, l);
 		case STMT_NONE:
 			str[l] = 0;
 			return tk;
@@ -384,6 +409,13 @@ const char * format_skip_expression(const char * tk)
 			tk += 2;
 			break;
 
+		case TK_CONTROL:
+			if (t == TK_STRING)
+				tk += tk[1] + 2;
+			else
+				tk++;
+			break;
+
 		default:
 			tk++;
 		}
@@ -400,17 +432,16 @@ const char * format_skip_statement(const char * tk)
 		char t = *tk++;
 		switch (t)
 		{
-		case STMT_EXPRESSION:
-			return format_skip_expression(tk);
+		case STMT_DEF:
 		case STMT_WHILE:
-			return format_skip_expression(tk + 2);
 		case STMT_IF:
-			return format_skip_expression(tk + 2);
 		case STMT_ELSIF:
 			return format_skip_expression(tk + 2);
 		case STMT_ELSE:
 			return tk + 2;
+		case STMT_EXPRESSION:
 		case STMT_VAR:
+		case STMT_RETURN:
 			return format_skip_expression(tk);
 		case STMT_NONE:
 			return tk;

@@ -89,9 +89,8 @@ int main(void)
 			{
 				putch(147);
 				prepare_statements(tokens);
-				const char * ctk = tokens;
-				while (*ctk && *(volatile char *)0x91 != 0x7f)
-					ctk = interpret_statement(ctk);
+				while (*exectk && *(volatile char *)0x91 != 0x7f)
+					interpret_statement();
 				restore_statements(tokens);
 				getch();
 				putch(147); putch(14);

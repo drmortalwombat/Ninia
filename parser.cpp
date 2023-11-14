@@ -241,6 +241,29 @@ char * parse_expression(const char * str, char * tk)
 				tk = parse_op(TK_GREATER_THAN, tk);
 			prefix = true;
 			break;
+		case '"':
+			{
+				if (!prefix)
+					return nullptr;
+
+				c = *str++;
+				char i = 0;
+				while (c != '"')
+				{
+					if (!c)
+						return nullptr;
+
+					tk[i + 2] = c;
+					i++;
+					c = *str++;
+				}
+				c = *str++;
+
+				tk[0] = TK_STRING;
+				tk[1] = i;
+				tk += i + 2;
+				prefix = false;
+			} break;				
 		default:
 			if (is_letter(c))
 			{
@@ -314,6 +337,21 @@ char * parse_expression(const char * str, char * tk)
 	}
 }
 
+char * parse_params(const char * str, char * tk)
+{
+	char * etk = tk;
+	tk = parse_expression(str, tk);
+	if (tk)
+	{
+		char i = 0;
+		while ((etk[2 * i] & 0xf0) == TK_IDENT)
+			i++;
+		if (etk[2 * i] == TK_INVOKE && etk[2 * i + 1] + 1 == i)
+			return tk;
+	}
+	return nullptr;
+}
+
 char tolower(char ch)
 {
 	if (ch >= p'A' && ch <= p'Z')
@@ -373,6 +411,18 @@ char * parse_statement(const char * str, char * tk)
 	{
 		*tk++ = STMT_VAR;
 		tk = parse_expression(str + i, tk);
+	}
+	else if (!strcmp(idbuf, p"return"))
+	{
+		*tk++ = STMT_RETURN;
+		tk = parse_expression(str + i, tk);
+	}
+	else if (!strcmp(idbuf, p"def"))
+	{
+		*tk++ = STMT_DEF;
+		*tk++ = 0;
+		*tk++ = 0;
+		tk = parse_params(str + i, tk);
 	}
 	else
 	{

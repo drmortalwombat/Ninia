@@ -2,15 +2,9 @@
 #include "variables.h"
 #include "tokens.h"
 #include "symbols.h"
-__striped struct EvalStack
-{
-	bool	lvalue;
-	union {
-		long		value;
-		long	*	addr;
-	} v;
-}	estack[32];
-char		esp;
+
+__striped Value		estack[32];
+char				esp;
 
 struct StmtStack
 {
@@ -19,6 +13,15 @@ struct StmtStack
 
 char ssp;
 
+struct CallStack
+{
+	StmtStack		smts[16];
+	char			ssp;
+	const char	*	tk;
+	char			ti;
+}	callstack[16];
+
+char csp;
 
 char * prepare_expression(char * tk, bool var)
 {
@@ -66,10 +69,22 @@ char * prepare_expression(char * tk, bool var)
 			left = false;
 			break;
 
-		case TK_COMMA:
-			tk++;
-			left = true;
-			break;
+		case TK_CONTROL:
+			{
+				switch (t)
+				{
+				case TK_COMMA:
+					tk++;
+					left = true;
+					break;
+				case TK_STRING:
+					tk += tk[1] + 2;
+					left = false;
+					break;
+				default:
+					tk++;
+				}
+			} break;
 
 		default:
 			tk++;
@@ -80,10 +95,24 @@ char * prepare_expression(char * tk, bool var)
 	return tk + 1;
 }
 
+char * prepare_function(char * tk)
+{
+	unsigned ti = ((tk[0] & 0x0f) << 8) | tk[1];
+	unsigned vi = global_add(ti);
+
+	globals[vi].v.type = TYPE_FUNCTION;
+	globals[vi].v.value = unsigned(tk + 2);
+	while ((tk[0] & 0xf0) == TK_IDENT)
+		tk += 2;
+	return tk + 2;
+}
+
 void prepare_statements(char * tk)
 {
+	exectk = tk;
 	ssp = 0;
 	esp = 0;
+	csp = 0;
 	num_globals = 0;
 
 	char 		pl = 1;
@@ -106,11 +135,19 @@ void prepare_statements(char * tk)
 		switch (t)
 		{
 		case STMT_EXPRESSION:
+		case STMT_RETURN:
 			tk = prepare_expression(tk, false);
 			break;
 		case STMT_VAR:
 			tk = prepare_expression(tk, true);
 			break;
+		case STMT_DEF:
+			tk[0] = (unsigned)pt & 0xff;
+			tk[1] = (unsigned)pt >> 8;
+			pt = tk;
+			tk = prepare_function(tk + 2);
+			pl++;
+			break;		
 		case STMT_NONE:
 			break;
 		case STMT_WHILE:
@@ -169,9 +206,17 @@ char * restore_expression(char * tk, bool var)
 			tk += 2;
 			break;
 
-		case TK_COMMA:
-			tk++;
-			break;
+		case TK_CONTROL:
+			{
+				switch (t)
+				{
+				case TK_STRING:
+					tk += tk[1] + 2;
+					break;
+				default:
+					tk++;
+				}
+			} break;
 
 		default:
 			tk++;
@@ -179,6 +224,13 @@ char * restore_expression(char * tk, bool var)
 		t = *tk;
 	}
 	return tk + 1;
+}
+
+char * restore_function(char * tk)
+{
+	while ((tk[0] & 0xf0) == TK_IDENT)
+		tk += 2;
+	return tk + 2;
 }
 
 
@@ -210,47 +262,182 @@ void restore_statements(char * tk)
 			tk[0] = 0;
 			tk[1] = 0;
 			tk += 2;
-			break;					
+			break;			
+		case STMT_DEF:
+			tk[0] = 0;
+			tk[1] = 0;
+			tk = restore_function(tk + 2);
+			break;				
 		}
 		l = *tk;
 	}	
 }
 
-long rvalpop(void)
-{
-	esp--;
-	if (estack[esp].lvalue)
-		return *(estack[esp].v.addr);
-	else
-		return estack[esp].v.value;
-}
-
-long rvalget(char at)
+void valderef(char at)
 {
 	char ei = esp - at - 1;
-	if (estack[ei].lvalue)
-		return *(estack[ei].v.addr);
-	else
-		return estack[ei].v.value;
+	switch (estack[ei].type)
+	{
+	case TYPE_GLOBAL_REF:
+		estack[ei] = globals[(char)(estack[ei].value)].v;
+		break;
+	}
 }
 
-void rvalpush(long value)
+bool boolpop(void)
 {
-	estack[esp].lvalue = false;
-	estack[esp].v.value = value;
+	valderef(0);
+	esp--;
+	return estack[esp].value != 0;
+}
+
+long valpop(void)
+{
+	esp--;
+	return estack[esp].value;
+}
+
+long valget(char at)
+{
+	char ei = esp - at - 1;
+	return estack[ei].value;
+}
+
+inline char typeget(char at)
+{
+	char ei = esp - at - 1;
+	return estack[ei].type;
+}
+
+void valpush(char type, long value)
+{
+	estack[esp].type = type;
+	estack[esp].value = value;
 	esp++;
+}
+
+void valassign(void)
+{
+	esp--;
+	switch (estack[esp - 1].type)
+	{
+	case TYPE_GLOBAL_REF:
+		globals[(char)(estack[esp - 1].value)].v = estack[esp];
+		break;
+	}
 }
 
 void valswap(void)
 {
-	EvalStack	es = estack[esp - 1];
+	Value	es = estack[esp - 1];
 	estack[esp - 1] = estack[esp - 2];
 	estack[esp - 2] = es;
 }
 
-const char * interpret_expression(const char * tk)
+const char * exectk;
+
+void interpret_builtin(char n)
 {
-	esp = 0;
+	long lf = valget(n);
+	switch (lf)
+	{
+	case RTSYM_ABS:
+		{
+			valderef(0);
+			long li = valpop();
+			esp -= n;
+			valpush(TYPE_NUMBER, labs(li));
+		} break;
+	case RTSYM_CHROUT:
+		{
+			valderef(0);
+			long li = valpop();
+			esp -= n;
+			putch(li >> 16);
+			valpush(TYPE_NULL, 0);
+		} break;		
+	case RTSYM_RAND:
+		esp -= n + 1;
+		valpush(TYPE_NUMBER, rand());
+		break;
+	case RTSYM_PRINT:
+		{
+			for(char i=0; i<n; i++)
+			{
+				char k = n - i - 1;
+				valderef(k);
+				switch (typeget(k))
+				{
+				case TYPE_NUMBER:
+					{
+						char 	str[20];
+						long	s = valget(k);
+						if (s < 0)
+						{
+							putch('-');
+							s = -s;
+						}
+						unsigned	hi = (unsigned long)s >> 16;
+						if (hi == 0)
+							putch('0');
+						else
+						{
+							char i = 0;
+							while (hi)
+							{
+								str[i] = hi % 10 + '0';
+								hi /= 10;
+								i++;
+							}
+							while (i > 0)
+							{
+								i--;
+								putch(str[i]);
+							}
+						}
+						unsigned long l = s & 0xffff;
+						if (l)
+						{
+							str[0] = '.';
+							char j = 1;
+							for(char i=0; i<4; i++)
+							{
+								l *= 10;
+								str[j] = char(l >> 16) + '0';
+								j++;
+								l &= 0xfffful;
+							}
+							while (str[j-1] == '0')
+								j--;
+							if (str[j-1] == '.')
+								j--;
+							char i = 0;
+							while (i < j)
+							{
+								putch(str[i]);
+								i++;
+							}
+						}
+
+					} break;
+				case TYPE_STRING:
+					{
+						const char * str = (const char *)valget(k);
+						char n = str[0];
+						for(char i=0; i<n; i++)
+							putch(str[i + 1]);
+					} break;
+				}
+			}
+			esp -= n + 1;
+			valpush(TYPE_NULL, 0);
+		} break;
+	}
+}
+
+bool interpret_expression(void)
+{
+	const char * tk = exectk;
 
 	char	ti = 0;
 	for(;;)
@@ -259,10 +446,10 @@ const char * interpret_expression(const char * tk)
 		switch (t & 0xf0)
 		{
 		case TK_TINY_INT:
-			rvalpush((unsigned long)(t & 0x0f) << 16);
+			valpush(TYPE_NUMBER, (unsigned long)(t & 0x0f) << 16);
 			break;
 		case TK_SMALL_INT:
-			rvalpush((unsigned long)(((t & 0x0f) << 8) | tk[ti++]) << 16);
+			valpush(TYPE_NUMBER, (unsigned long)(((t & 0x0f) << 8) | tk[ti++]) << 16);
 			break;
 		case TK_NUMBER:
 		{
@@ -273,13 +460,13 @@ const char * interpret_expression(const char * tk)
 			l |= tk[ti++];
 			l <<= 8;
 			l |= tk[ti++];
-			rvalpush(l);
+			valpush(TYPE_NUMBER, l);
 		}	break;
 
 		case TK_IDENT:
 			{
 				unsigned tv = ((t & 0x0f) << 8) | tk[ti++];
-				rvalpush(tv);
+				valpush(TYPE_SYMBOL, tv);
 			} break;
 		case TK_CONST:	
 		case TK_LOCAL:
@@ -288,15 +475,16 @@ const char * interpret_expression(const char * tk)
 		case TK_GLOBAL:	
 			{
 				unsigned tv = ((t & 0x0f) << 8) | tk[ti++];
-				estack[esp].lvalue = true;
-				estack[esp].v.addr = &(globals[tv].value);
-				esp++;
+				valpush(TYPE_GLOBAL_REF, tv);
 			} break;
 
 		case TK_BINARY:
 			{
-				long l2 = rvalpop();
-				long l1 = rvalpop();
+				valderef(0); 
+				valderef(1);
+
+				long l2 = valpop();
+				long l1 = valpop();
 
 				switch (t)
 				{
@@ -328,12 +516,17 @@ const char * interpret_expression(const char * tk)
 					l1 = (unsigned long)((unsigned)(l1 >> 16) | (unsigned)(l2 >> 16)) << 16;
 					break;
 				}
-				rvalpush(l1);
+
+				valpush(TYPE_NUMBER, l1);
 			}	break;
 		case TK_RELATIONAL:
 			{
-				long 	l2 = rvalpop();
-				long 	l1 = rvalpop();
+				valderef(0); 
+				valderef(1);
+
+				long l2 = valpop();
+				long l1 = valpop();
+
 				bool	b = false;
 
 				switch (t)
@@ -358,16 +551,18 @@ const char * interpret_expression(const char * tk)
 					break;	
 				}
 
-				rvalpush(b ? 0x10000ul : 0ul);
+				valpush(TYPE_NUMBER, b ? 0x10000ul : 0ul);
 			} break;
 		case TK_PREFIX:
 			switch (t)
 			{
 			case TK_NEGATE:
-				rvalpush(-rvalpop());
+				valderef(0); 
+				valpush(TYPE_NUMBER, -valpop());
 				break;
 			case TK_NOT:
-				rvalpush((unsigned long)(~(unsigned)(rvalpop() >> 16)) << 16);
+				valderef(0); 
+				valpush(TYPE_NUMBER, (unsigned long)(~(unsigned)(valpop() >> 16)) << 16);
 				break;
 			}
 			break;
@@ -383,42 +578,21 @@ const char * interpret_expression(const char * tk)
 				{
 					char n = tk[ti++];
 
-					long lf = rvalget(n);
-					if (n == 1)
+					valderef(n); 
+					switch (typeget(n))
 					{
-						long	li = rvalpop();
-						esp--;
-
-						switch (lf)
-						{
-						case RTSYM_ABS:
-							rvalpush(labs(li));
-							break;
-						case RTSYM_CHROUT:
-							putch(li >> 16);
-							rvalpush(0);
-							break;
-						}
+					case TYPE_SYMBOL:
+						interpret_builtin(n);
+						break;
 					}
-					else if (n == 0)
-					{
-						esp--;
-						switch (lf)
-						{
-						case RTSYM_RAND:
-							rvalpush(rand());
-							break;
-						}
-					}
-
 				}	break;
 			}
 			break;
 
 		case TK_ASSIGN:
 			{
-				long l = rvalpop();
-				*(estack[esp-1].v.addr) = l;
+				valderef(0);
+				valassign();
 			}	break;
 
 		case TK_STRUCTURE:
@@ -445,9 +619,14 @@ const char * interpret_expression(const char * tk)
 				switch (t)
 				{
 				case TK_END:
-					return tk + ti;
+					exectk += ti;
+					return true;
 				case TK_COMMA:
 					esp--;
+					break;
+				case TK_STRING:
+					valpush(TYPE_STRING, (unsigned)(tk + ti));
+					ti += tk[ti] + 1;
 					break;
 				}
 			}
@@ -455,75 +634,84 @@ const char * interpret_expression(const char * tk)
 	}
 }
 
-const char * interpret_statement(const char * etk)
+void interpret_statement(void)
 {
-	const char * tk = etk;
+	const char * tk = exectk;
 
-	char 	l = *tk - 1;
+	char 	l = tk[0] - 1;
 	while (l < ssp)
 	{
 		tk = stmstack[--ssp].tk;
-		l = *tk - 1;
+		l = tk[0] - 1;
 	}
 
-	etk = tk;
+	const char * etk = tk;
 
-	tk++;
-	char 	t = *tk++;
+	char 	t = tk[1];
 
 	switch (t)
 	{
-	case STMT_EXPRESSION:
-		tk = interpret_expression(tk);
-		esp--;
-		break;
-	case STMT_VAR:
-		tk = interpret_expression(tk);
-		break;
 	case STMT_NONE:
-		break;
-	case STMT_WHILE:
-		tk = interpret_expression(tk + 2);
-		if (rvalpop())
-		{
-			stmstack[ssp].tk = etk;
-			ssp++;
-		}
-		else
-		{
-			tk = (char *)(etk[2] + (etk[3] << 8));
-		}
-		break;		
-	case STMT_IF:
-		tk = interpret_expression(tk + 2);
-		while (!rvalpop())
-		{
-			tk = (char *)(etk[2] + (etk[3] << 8));
-			if (tk[0] == etk[0])
-			{
-				if (tk[1] == STMT_ELSE)
-				{
-					tk += 4;
-					break;
-				}
-				else if (tk[1] == STMT_ELSIF)
-				{
-					etk = tk;					
-					tk++;
-					tk = interpret_expression(tk + 2);
-				}
-			}
-			else
-				break;
-		}
-		break;
-	case STMT_ELSIF:
+		exectk = tk + 2;
+		return;
 	case STMT_ELSE:
-		tk = (char *)(etk[2] + (etk[3] << 8));
+	case STMT_ELSIF:
+	case STMT_DEF:
+		exectk = (char *)(etk[2] + (etk[3] << 8));
+		return;
+	case STMT_WHILE:
+	case STMT_IF:
+		tk += 4;
 		break;
-
+	default:
+		tk += 2;
 	}
 
-	return tk;
+	for(;;)
+	{
+		exectk = tk;
+
+		interpret_expression();
+
+		switch (t)
+		{
+		case STMT_EXPRESSION:
+		case STMT_VAR:
+			esp--;
+			return;
+
+		case STMT_WHILE:
+			if (boolpop())
+			{
+				stmstack[ssp].tk = etk;
+				ssp++;
+			}
+			else
+				exectk = (char *)(etk[2] + (etk[3] << 8));
+			return;
+
+		case STMT_IF:
+		case STMT_ELSIF:
+			if (boolpop())
+				return;
+
+			tk = (char *)(etk[2] + (etk[3] << 8));
+			if (tk[0] != etk[0])
+				return;
+
+			if (tk[1] == STMT_ELSE)
+			{
+				tk += 4;
+				return;
+			}
+			else if (tk[1] == STMT_ELSIF)
+			{
+				etk = tk;
+				tk += 4;
+			}
+			else
+				return;
+		}
+	}
 }
 	

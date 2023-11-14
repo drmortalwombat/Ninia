@@ -10,6 +10,7 @@ void symbols_init(void);
 #define RTSYM_ABS		0x100
 #define	RTSYM_RAND		0x101
 #define RTSYM_CHROUT	0x102
+#define RTSYM_PRINT		0x103
 
 unsigned symbol_add(const char * s);
 
