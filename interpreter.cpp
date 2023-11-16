@@ -2,26 +2,48 @@
 #include "variables.h"
 #include "tokens.h"
 #include "symbols.h"
+#include <fixmath.h>
 
-__striped Value		estack[32];
-char				esp;
+#define VALUE_STACK_SIZE	64
 
-struct StmtStack
-{
-	const char * tk;
-}	stmstack[16];
+__striped Value		estack[VALUE_STACK_SIZE];
+char				esp, efp;
 
-char ssp;
+const char * loopstart[16];
+const char * exectk;
+char exect;
+char execl;
+
 
 struct CallStack
 {
-	StmtStack		smts[16];
-	char			ssp;
+	const char *	loopstart[16];
+	char			efp, esp;
 	const char	*	tk;
-	char			ti;
+	char			t, l;
 }	callstack[16];
 
 char csp;
+
+unsigned		localvars[32];
+char			num_locals;
+char	*		functk;
+
+unsigned local_find(unsigned symbol)
+{
+	char i = 0;
+	for(char i=0; i<num_locals; i++)
+		if (localvars[i] == symbol)
+			return i;
+	return num_locals;
+}
+
+unsigned local_add(unsigned symbol)
+{
+	localvars[num_locals] = symbol;
+	return num_locals++;
+}
+
 
 char * prepare_expression(char * tk, bool var)
 {
@@ -50,13 +72,27 @@ char * prepare_expression(char * tk, bool var)
 				if (tt == TK_IDENT)
 				{
 					if (left && var)
-						global_add(ti);
-
-					unsigned	vi = global_find(ti);
-					if (vi < num_globals)
 					{
-						tk[0] = (vi >> 8) | TK_GLOBAL;
+						if (functk)
+							local_add(ti);
+						else
+							global_add(ti);
+					}
+
+					unsigned	vi = local_find(ti);
+					if (vi < num_locals)
+					{
+						tk[0] = (vi >> 8) | TK_LOCAL;
 						tk[1] = vi & 0xff;
+					}
+					else
+					{
+						vi = global_find(ti);
+						if (vi < num_globals)
+						{
+							tk[0] = (vi >> 8) | TK_GLOBAL;
+							tk[1] = vi & 0xff;
+						}
 					}
 				}
 			tk += 2;
@@ -98,22 +134,32 @@ char * prepare_expression(char * tk, bool var)
 char * prepare_function(char * tk)
 {
 	unsigned ti = ((tk[0] & 0x0f) << 8) | tk[1];
-	unsigned vi = global_add(ti);
+	char vi = global_add(ti);
+
+	tk += 2;
+
+	while ((tk[0] & 0xf0) == TK_IDENT)
+	{
+		local_add(((tk[0] & 0x0f) << 8) | tk[1]);
+		tk += 2;
+	}
 
 	globals[vi].v.type = TYPE_FUNCTION;
-	globals[vi].v.value = unsigned(tk + 2);
-	while ((tk[0] & 0xf0) == TK_IDENT)
-		tk += 2;
-	return tk + 2;
+	globals[vi].v.value = unsigned(tk);
+	functk = tk;
+
+	return tk + 3;
 }
 
 void prepare_statements(char * tk)
 {
 	exectk = tk;
-	ssp = 0;
-	esp = 0;
+	execl = 0;
+	esp = VALUE_STACK_SIZE;
 	csp = 0;
 	num_globals = 0;
+	num_locals = 0;
+	functk = nullptr;
 
 	char 		pl = 1;
 	char 		l = *tk;
@@ -128,6 +174,13 @@ void prepare_statements(char * tk)
 			pt[1] = (unsigned)tk >> 8;
 			pt = ppt;
 			pl--;
+		}
+
+		if (l == 1 && functk)
+		{
+			functk[1] = num_locals;
+			num_locals = 0;
+			functk = nullptr;
 		}
 
 		tk++;
@@ -148,6 +201,7 @@ void prepare_statements(char * tk)
 			tk = prepare_function(tk + 2);
 			pl++;
 			break;		
+		case STMT_RETURN_NULL:
 		case STMT_NONE:
 			break;
 		case STMT_WHILE:
@@ -168,6 +222,15 @@ void prepare_statements(char * tk)
 			break;					
 		}
 		l = *tk;
+	}
+
+	while (pl > 1)
+	{
+		char * ppt = (char *)(pt[0] + (pt[1] << 8));
+		pt[0] = (unsigned)tk & 0xff;
+		pt[1] = (unsigned)tk >> 8;
+		pt = ppt;
+		pl--;
 	}
 }
 
@@ -197,6 +260,12 @@ char * restore_expression(char * tk, bool var)
 					unsigned vi = globals[ti].symbol;
 					tk[0] = (vi >> 8) | TK_IDENT;
 					tk[1] = vi & 0xff;
+				}
+				else if (tt == TK_LOCAL)
+				{
+					unsigned vi = localvars[ti];
+					tk[0] = (vi >> 8) | TK_IDENT;
+					tk[1] = vi & 0xff;					
 				}
 			tk += 2;
 			}	break;
@@ -228,27 +297,50 @@ char * restore_expression(char * tk, bool var)
 
 char * restore_function(char * tk)
 {
+	functk = tk;
+
+	tk += 2;
+
+	char n = 0;
 	while ((tk[0] & 0xf0) == TK_IDENT)
+	{		
+		local_add(((tk[0] & 0x0f) << 8) | tk[1]);
 		tk += 2;
-	return tk + 2;
+		n++;
+	}
+
+	tk[1] = n;
+
+	return tk + 3;
 }
 
 
 void restore_statements(char * tk)
 {
+	num_locals = 0;
+	functk = nullptr;	
+
 	char	l = *tk;
 	while (l > 0)
 	{		
+		if (l == 1 && functk)
+		{
+			num_locals = 0;
+			functk = nullptr;
+		}
+
 		tk++;
 		char 	t = *tk++;
 		switch (t)
 		{
 		case STMT_EXPRESSION:
+		case STMT_RETURN:
 			tk = restore_expression(tk, false);
 			break;
 		case STMT_VAR:
 			tk = restore_expression(tk, true);
 			break;
+		case STMT_RETURN_NULL:
 		case STMT_NONE:
 			break;
 		case STMT_WHILE:
@@ -275,11 +367,14 @@ void restore_statements(char * tk)
 
 void valderef(char at)
 {
-	char ei = esp - at - 1;
+	char ei = esp + at;
 	switch (estack[ei].type)
 	{
 	case TYPE_GLOBAL_REF:
 		estack[ei] = globals[(char)(estack[ei].value)].v;
+		break;
+	case TYPE_LOCAL_REF:
+		estack[ei] = estack[(char)(efp - estack[ei].value)];
 		break;
 	}
 }
@@ -287,77 +382,76 @@ void valderef(char at)
 bool boolpop(void)
 {
 	valderef(0);
-	esp--;
-	return estack[esp].value != 0;
+	return estack[esp++].value != 0;
 }
 
 long valpop(void)
 {
-	esp--;
-	return estack[esp].value;
+	return estack[esp++].value;
 }
 
 long valget(char at)
 {
-	char ei = esp - at - 1;
+	char ei = esp + at;
 	return estack[ei].value;
 }
 
 inline char typeget(char at)
 {
-	char ei = esp - at - 1;
+	char ei = esp + at;
 	return estack[ei].type;
 }
 
 void valpush(char type, long value)
 {
+	esp--;
 	estack[esp].type = type;
 	estack[esp].value = value;
-	esp++;
 }
 
 void valassign(void)
 {
-	esp--;
-	switch (estack[esp - 1].type)
+	switch (estack[esp + 1].type)
 	{
 	case TYPE_GLOBAL_REF:
-		globals[(char)(estack[esp - 1].value)].v = estack[esp];
+		globals[(char)(estack[esp + 1].value)].v = estack[esp];
+		break;
+	case TYPE_LOCAL_REF:
+		estack[(char)(efp - estack[esp + 1].value)] = estack[esp];
 		break;
 	}
+	esp++;
 }
 
 void valswap(void)
 {
-	Value	es = estack[esp - 1];
-	estack[esp - 1] = estack[esp - 2];
-	estack[esp - 2] = es;
+	Value	es = estack[esp];
+	estack[esp] = estack[esp + 1];
+	estack[esp + 1] = es;
 }
-
-const char * exectk;
 
 void interpret_builtin(char n)
 {
-	long lf = valget(n);
+	unsigned lf = valget(n);
 	switch (lf)
 	{
 	case RTSYM_ABS:
 		{
 			valderef(0);
 			long li = valpop();
-			esp -= n;
+			esp += n;
 			valpush(TYPE_NUMBER, labs(li));
 		} break;
 	case RTSYM_CHROUT:
 		{
 			valderef(0);
 			long li = valpop();
-			esp -= n;
+			esp += n;
 			putch(li >> 16);
 			valpush(TYPE_NULL, 0);
 		} break;		
 	case RTSYM_RAND:
-		esp -= n + 1;
+		esp += n + 1;
 		valpush(TYPE_NUMBER, rand());
 		break;
 	case RTSYM_PRINT:
@@ -429,8 +523,25 @@ void interpret_builtin(char n)
 					} break;
 				}
 			}
-			esp -= n + 1;
+			esp += n + 1;
 			valpush(TYPE_NULL, 0);
+		} break;
+	case RTSYM_POKE:
+		{
+			valderef(0);
+			char v = (unsigned long)(valpop()) >> 16;
+			valderef(0);			
+			volatile char * lp = (char *)((unsigned long)(valpop()) >> 16);
+			*lp = v;
+			esp += n - 1;
+			valpush(TYPE_NULL, 0);
+		} break;
+	case RTSYM_PEEK:
+		{
+			valderef(0);
+			volatile char * lp = (char *)((unsigned long)(valpop()) >> 16);
+			esp += n;
+			valpush(TYPE_NUMBER, (long)*lp << 16);
 		} break;
 	}
 }
@@ -469,8 +580,12 @@ bool interpret_expression(void)
 				valpush(TYPE_SYMBOL, tv);
 			} break;
 		case TK_CONST:	
-		case TK_LOCAL:
 			break;
+		case TK_LOCAL:
+			{
+				unsigned tv = ((t & 0x0f) << 8) | tk[ti++];
+				valpush(TYPE_LOCAL_REF, tv);
+			} break;
 
 		case TK_GLOBAL:	
 			{
@@ -495,10 +610,10 @@ bool interpret_expression(void)
 					l1 -= l2;
 					break;
 				case TK_MUL:
-					l1 *= l2;
+					l1 = lmul16f16s(l1, l2);
 					break;
 				case TK_DIV:
-					l1 /= l2;
+					l1 = ldiv16f16s(l1, l2);
 					break;
 				case TK_MOD:
 					l1 = (unsigned long)((unsigned)(l1 >> 16) % (unsigned)(l2 >> 16)) << 16;
@@ -584,6 +699,34 @@ bool interpret_expression(void)
 					case TYPE_SYMBOL:
 						interpret_builtin(n);
 						break;
+					case TYPE_FUNCTION:
+						{
+							callstack[csp].efp = efp;
+							callstack[csp].esp = esp + n;
+							callstack[csp].tk = tk + ti;
+							callstack[csp].t = exect;
+							callstack[csp].l = execl;
+							for(char i=0; i<execl; i++)
+								callstack[csp].loopstart[i] = loopstart[i];
+							csp++;
+
+							exectk = (char *)valget(n);
+							execl = 0;
+							loopstart[0] = nullptr;
+							char k = exectk[1];
+							
+							for(char i=0; i<n; i++)
+								valderef(i);
+							while (n < k)
+							{
+								valpush(TYPE_NULL, 0);
+								n++;
+							}
+							efp = esp + n - 1;
+
+							exectk += 3;
+							return false;
+						}
 					}
 				}	break;
 			}
@@ -603,8 +746,8 @@ bool interpret_expression(void)
 				case TK_LIST:
 					if (n > 0)
 					{
-						estack[esp - n] = estack[esp - 1];
-						esp -= n - 1;
+						estack[esp + n - 1] = estack[esp];
+						esp += n - 1;
 					}
 					break;
 				case TK_ARRAY:
@@ -622,7 +765,7 @@ bool interpret_expression(void)
 					exectk += ti;
 					return true;
 				case TK_COMMA:
-					esp--;
+					esp++;
 					break;
 				case TK_STRING:
 					valpush(TYPE_STRING, (unsigned)(tk + ti));
@@ -634,31 +777,50 @@ bool interpret_expression(void)
 	}
 }
 
-void interpret_statement(void)
+bool interpret_statement(void)
 {
 	const char * tk = exectk;
 
-	char 	l = tk[0] - 1;
-	while (l < ssp)
+	while (tk[0] && tk[1] == STMT_NONE)
+		tk += 2;
+
+	char 	l = tk[0];
+	if (l > 0) l--;
+
+	if (l > execl)
+		execl = l;
+	else
 	{
-		tk = stmstack[--ssp].tk;
-		l = tk[0] - 1;
+		while (l < execl)
+		{
+			execl--;
+			if (loopstart[execl])
+			{
+				tk = loopstart[execl];
+				break;
+			}
+		}
 	}
+
+	loopstart[execl] = nullptr;
+
+	if (!tk[0])
+		return false;
 
 	const char * etk = tk;
 
 	char 	t = tk[1];
 
+	if (execl == 0 && csp > 0)
+		t = STMT_RETURN_NULL;
+
 	switch (t)
 	{
-	case STMT_NONE:
-		exectk = tk + 2;
-		return;
 	case STMT_ELSE:
 	case STMT_ELSIF:
 	case STMT_DEF:
 		exectk = (char *)(etk[2] + (etk[3] << 8));
-		return;
+		return true;
 	case STMT_WHILE:
 	case STMT_IF:
 		tk += 4;
@@ -670,39 +832,59 @@ void interpret_statement(void)
 	for(;;)
 	{
 		exectk = tk;
+		exect = t;
 
-		interpret_expression();
+		if (t == STMT_RETURN_NULL)
+			valpush(TYPE_NULL, 0);
+		else
+		{
+			if (!interpret_expression())
+				return true;
+		}
 
 		switch (t)
 		{
 		case STMT_EXPRESSION:
 		case STMT_VAR:
-			esp--;
-			return;
+			esp++;
+			return true;
+
+		case STMT_RETURN_NULL:
+		case STMT_RETURN:
+			{
+				csp--;
+				char rsp = callstack[csp].esp;
+				estack[rsp] = estack[esp];
+				esp = rsp;
+
+				efp = callstack[csp].efp;
+				tk = callstack[csp].tk;
+				t =  callstack[csp].t;
+				execl = callstack[csp].l;
+				for(char i=0; i<execl; i++)
+					loopstart[i] = callstack[csp].loopstart[i];
+			} break;
 
 		case STMT_WHILE:
 			if (boolpop())
-			{
-				stmstack[ssp].tk = etk;
-				ssp++;
-			}
+				loopstart[execl] = etk;
 			else
 				exectk = (char *)(etk[2] + (etk[3] << 8));
-			return;
+			return true;
 
 		case STMT_IF:
 		case STMT_ELSIF:
 			if (boolpop())
-				return;
+				return true;
 
 			tk = (char *)(etk[2] + (etk[3] << 8));
 			if (tk[0] != etk[0])
-				return;
+				return true;
 
 			if (tk[1] == STMT_ELSE)
 			{
-				tk += 4;
-				return;
+				exectk = tk + 4;
+				return true;
 			}
 			else if (tk[1] == STMT_ELSIF)
 			{
@@ -710,7 +892,7 @@ void interpret_statement(void)
 				tk += 4;
 			}
 			else
-				return;
+				return true;
 		}
 	}
 }

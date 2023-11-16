@@ -317,7 +317,7 @@ char edit_line(void)
 			if (upy != cursory)
 				uptk = edit_display_line(upy, uptk);
 			else
-				uptk = format_skip_statement(uptk);
+				uptk += token_skip_statement(uptk);
 			upy++;
 		}
 	}

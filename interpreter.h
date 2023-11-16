@@ -7,7 +7,7 @@ void restore_statements(char * tk);
 
 extern const char * exectk;
 
-void interpret_statement(void);
+bool interpret_statement(void);
 
 #pragma compile("interpreter.cpp")
 

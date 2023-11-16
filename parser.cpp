@@ -253,6 +253,15 @@ char * parse_expression(const char * str, char * tk)
 					if (!c)
 						return nullptr;
 
+					if (c == '\\')
+					{
+						c = *str++;
+						if (c == p'n' || c == p'N')
+							c = 13;
+						else if (c == p't' || c == p'T')
+							c = 8;
+					}
+
 					tk[i + 2] = c;
 					i++;
 					c = *str++;
@@ -365,9 +374,9 @@ char * parse_statement(const char * str, char * tk)
 	char l = 0;
 	while (str[l] == ' ')
 		l++;
-	*tk++ = l + 1;
 
 	char * etk = tk;
+	*tk++ = l + 1;
 
 	str += l;
 	char i = 0;
@@ -414,11 +423,17 @@ char * parse_statement(const char * str, char * tk)
 	}
 	else if (!strcmp(idbuf, p"return"))
 	{
-		*tk++ = STMT_RETURN;
-		tk = parse_expression(str + i, tk);
+		if (str[i])
+		{
+			*tk++ = STMT_RETURN;
+			tk = parse_expression(str + i, tk);
+		}
+		else
+			*tk++ = STMT_RETURN_NULL;
 	}
 	else if (!strcmp(idbuf, p"def"))
 	{
+		etk[0] = 1;
 		*tk++ = STMT_DEF;
 		*tk++ = 0;
 		*tk++ = 0;
@@ -432,17 +447,61 @@ char * parse_statement(const char * str, char * tk)
 
 	if (!tk)
 	{
-		etk[0] = STMT_ERROR;
+		etk[1] = STMT_ERROR;
 		i = 0;
 		while (str[i])
 		{
-			etk[2 + i] = str[i];
+			etk[3 + i] = str[i];
 			i++;
 		}
-		etk[1] = i;
-		tk = etk + 2 + i;
+		etk[2] = i;
+		tk = etk + 3 + i;
 	}
 
 	return tk;
 }
 
+void parse_pretty(char * tk)
+{
+	char lmin = 1, lmax = 1;
+	char dl = 0;
+
+	while (tk[0])
+	{
+		char t = tk[1];
+
+		if (t != STMT_NONE)
+		{
+			char l = tk[0];
+
+			if (t == STMT_DEF)
+				lmin = lmax = 1;
+			else if (lmax > 1 && (t == STMT_ELSE || t == STMT_ELSIF))
+				lmin = lmax = lmax - 1;
+			
+			if (l < lmin)
+				l = lmin;
+			else if (l > lmax)
+				l = lmax;
+
+			lmax = l;
+			lmin = 1;
+
+			tk[0] = l;
+		}
+		else
+			tk[0] = lmin;
+
+		switch (t)
+		{
+		case STMT_DEF:
+		case STMT_IF:
+		case STMT_ELSE:
+		case STMT_ELSIF:
+		case STMT_WHILE:
+			lmin = lmax = lmax + 1;
+			break;
+		}
+		tk += token_skip_statement(tk);		
+	}
+}

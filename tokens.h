@@ -87,6 +87,7 @@
 #define STMT_ELSIF			0x22
 #define STMT_ELSE			0x23
 #define STMT_RETURN			0x24
+#define STMT_RETURN_NULL	0x25
 
 #define TYPE_NULL			0x01
 #define TYPE_NUMBER			0x02
@@ -105,5 +106,10 @@ struct Value
 	char	type;
 	long	value;
 };
+
+char token_skip_expression(const char * tk);
+
+char token_skip_statement(const char * tk);
+
 
 #pragma compile("tokens.cpp")

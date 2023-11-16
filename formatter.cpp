@@ -26,15 +26,23 @@ void format_insert2(char * str, char * color, char si, char ei, char c0, char c1
 	color[si + 1] = VCOL_MED_GREY;
 }
 
+const char binary_names[][2] = {
+	"+", "-", "*", "/", "%", "<<", ">>", "&", "|"
+};
+
+const char relational_names[][2] = {
+	"==", "!=", "<", "<=", ">", ">="
+};
+
 const char * format_expression(const char * tk, char * str, char * color, char si)
 {
-	char 		t = *tk++;
+	char		ti = 0;
+	char 		t = tk[ti++];
 	char		stack[32];
 	char		sp = 0;
 
 	while (t != TK_END)
 	{
-
 		switch (t & 0xf0)
 		{
 		case TK_TINY_INT:
@@ -48,7 +56,7 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 			break;
 		case TK_SMALL_INT:
 			stack[sp++] = si;
-			utoa(((t & 0x0f) << 8) | *tk++, str + si, 10);
+			utoa(((t & 0x0f) << 8) | tk[ti++], str + si, 10);
 			while (str[si])
 			{
 				color[si] = VCOL_LT_GREY;
@@ -58,17 +66,17 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 		case TK_NUMBER:
 			{
 				stack[sp++] = si;
-				unsigned f = (*tk++ << 8);
-				f |= *tk++;
+				unsigned f = (tk[ti++] << 8);
+				f |= tk[ti++];
 				utoa(f, str + si, 10);
 				while (str[si])
 				{
 					color[si] = VCOL_LT_GREY;
 					si++;
 				}
-				unsigned long l = *tk++;
+				unsigned long l = tk[ti++];
 				l <<= 8;
-				l |= *tk++; 
+				l |= tk[ti++]; 
 				if (l)
 				{
 					str[si] = '.';
@@ -96,12 +104,12 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 			{
 				stack[sp++] = si;
 				char tt = t & 0xf0;
-				unsigned ti = ((t & 0x0f) << 8) | *tk++;
+				unsigned id = ((t & 0x0f) << 8) | tk[ti++];
 				const char * ss;			
 				if (tt == TK_IDENT)
-					ss = symbol_string(ti);
+					ss = symbol_string(id);
 				else if (tt == TK_GLOBAL)
-					ss = symbol_string(globals[ti].symbol);
+					ss = symbol_string(globals[id].symbol);
 				else 
 					ss = "";
 
@@ -114,6 +122,18 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 			}	break;
 
 		case TK_BINARY:
+#if 1
+			if (binary_names[t & 0x0f][1])
+			{
+				format_insert2(str, color, stack[--sp], si, binary_names[t & 0x0f][0], binary_names[t & 0x0f][1]);
+				si += 2;				
+			}
+			else
+			{
+				format_insert(str, color, stack[--sp], si, binary_names[t & 0x0f][0]);
+				si++;				
+			}
+#else
 			switch (t)
 			{
 			case TK_ADD:
@@ -153,8 +173,21 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 				si++;
 				break;
 			}
+#endif
 			break;
 		case TK_RELATIONAL:
+#if 1
+			if (relational_names[t & 0x0f][1])
+			{
+				format_insert2(str, color, stack[--sp], si, relational_names[t & 0x0f][0], relational_names[t & 0x0f][1]);
+				si += 2;				
+			}
+			else
+			{
+				format_insert(str, color, stack[--sp], si, relational_names[t & 0x0f][0]);
+				si++;				
+			}
+#else
 			switch (t)
 			{
 			case TK_EQUAL:
@@ -182,6 +215,7 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 				si += 2;
 				break;
 			}
+#endif
 			break;
 		case TK_PREFIX:
 			switch (t)
@@ -199,7 +233,7 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 
 		case TK_POSTFIX:
 			{
-				char n = *tk++;
+				char n = tk[ti++];
 				while (n > 1)
 				{
 					format_insert(str, color, stack[--sp], si, ',');
@@ -241,7 +275,7 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 			break;
 		case TK_STRUCTURE:
 			{
-				char n = *tk++;
+				char n = tk[ti++];
 				while (n > 1)
 				{
 					format_insert(str, color, stack[--sp], si, ',');
@@ -286,27 +320,37 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 					str[si] = '"';
 					color[si] = VCOL_MED_GREY;
 					si++;
-					char i = 0;
-					while (i < tk[0])
+					char n = tk[ti++];
+					for(char i=0; i<n; i++)
 					{
-						str[si] = tk[i + 1];
+						char c = tk[ti++];
+
+						if (c == 13 || c == 8 || c == '\\')
+						{
+							str[si] = '\\';
+							color[si] = VCOL_LT_BLUE;
+							si++;
+							if (c == 13)
+								c = p'n';
+							else if (c == 8)
+								c = p't';
+						}
+						str[si] = c;
 						color[si] = VCOL_LT_BLUE;
 						si++;
-						i++;
 					}
 					str[si] = '"';
 					color[si] = VCOL_MED_GREY;
 					si++;
-					tk += i + 1;
 				} break;
 			}
 			break;
 		}
-		t = *tk++;
+		t = tk[ti++];
 	}
 
 	str[si] = 0;
-	return tk;
+	return tk + ti;
 }
 
 char format_append(char * str, char * col, char si, const char * src)
@@ -357,6 +401,10 @@ const char * format_statement(const char * tk, char * str, char * col)
 		case STMT_RETURN:
 			l = format_append(str, col, l, p"RETURN ");
 			return format_expression(tk, str, col, l);
+		case STMT_RETURN_NULL:
+			l = format_append(str, col, l, p"RETURN");
+			str[l] = 0;
+			return tk;
 		case STMT_DEF:
 			l = format_append(str, col, l, p"DEF ");
 			return format_expression(tk + 2, str, col, l);
@@ -381,78 +429,5 @@ const char * format_statement(const char * tk, char * str, char * col)
 		str[0] = 0;
 
 	return tk;
-}
-
-const char * format_skip_expression(const char * tk)
-{
-	char 	t = *tk;
-	while (t != TK_END)
-	{
-		switch (t & 0xf0)
-		{
-		case TK_SMALL_INT:
-			tk += 2;
-			break;
-		case TK_NUMBER:
-			tk += 5;
-			break;
-
-		case TK_IDENT:
-		case TK_CONST:	
-		case TK_GLOBAL:	
-		case TK_LOCAL:
-			tk += 2;
-			break;
-
-		case TK_POSTFIX:
-		case TK_STRUCTURE:
-			tk += 2;
-			break;
-
-		case TK_CONTROL:
-			if (t == TK_STRING)
-				tk += tk[1] + 2;
-			else
-				tk++;
-			break;
-
-		default:
-			tk++;
-		}
-		t = *tk;
-	}
-	return tk + 1;
-}
-
-const char * format_skip_statement(const char * tk)
-{
-	if (*tk)
-	{
-		tk++;
-		char t = *tk++;
-		switch (t)
-		{
-		case STMT_DEF:
-		case STMT_WHILE:
-		case STMT_IF:
-		case STMT_ELSIF:
-			return format_skip_expression(tk + 2);
-		case STMT_ELSE:
-			return tk + 2;
-		case STMT_EXPRESSION:
-		case STMT_VAR:
-		case STMT_RETURN:
-			return format_skip_expression(tk);
-		case STMT_NONE:
-			return tk;
-		case STMT_ERROR:
-			{
-				char n = *tk++;
-				return tk + n;
-			} break;
-		}
-	}
-
-	return tk;	
 }
 

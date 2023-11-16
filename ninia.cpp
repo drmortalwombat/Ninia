@@ -35,13 +35,49 @@ int main(void)
 	tk = parse_statement(p"  chrout(66)", tk);
 	tk = parse_statement(p" x = x + 1", tk);
 	tk = parse_statement(p"chrout(10)", tk);
-
 #elif 0
-	tk = parse_statement("var x = 0", tk);
-	tk = parse_statement("while (x < 1000)", tk);
-	tk = parse_statement(" chrout(rand(2) + 205)", tk);
-	tk = parse_statement(" x = x + 1", tk);
-	tk = parse_statement("chrout(10)", tk);
+	tk = parse_statement(p"print(\"Hello World\")", tk);	
+#elif 0
+	tk = parse_statement(p"var x = 0", tk);
+	tk = parse_statement(p"while (x < 1000)", tk);
+	tk = parse_statement(p" chrout(rand(2) + 205)", tk);
+	tk = parse_statement(p" x = x + 1", tk);
+	tk = parse_statement(p"chrout(10)", tk);
+#elif 0
+	tk = parse_statement(p"def test(a, b)", tk);
+	tk = parse_statement(p" print(\"Hello\")", tk);
+	tk = parse_statement(p" return a + b", tk);
+	tk = parse_statement(p"print(\"Before\")", tk);	
+	tk = parse_statement(p"print(\"(\", test(4, 5), \")\")", tk);
+	tk = parse_statement(p"print(\"After\")", tk);	
+#elif 0
+	tk = parse_statement(p"def brace(n)", tk);
+	tk = parse_statement(p" print(\"<\", n, \">\")", tk);
+	tk = parse_statement(p"", tk);
+	tk = parse_statement(p"var i=0", tk);
+	tk = parse_statement(p"while i<10", tk);
+	tk = parse_statement(p" brace(i)", tk);
+	tk = parse_statement(p" i=i+1", tk);
+#elif 1
+	tk = parse_statement(p"def fib(n)", tk);
+	tk = parse_statement(p" if n < 2", tk);
+	tk = parse_statement(p"  return 1", tk);
+	tk = parse_statement(p" else", tk);
+	tk = parse_statement(p"  return fib(n-1)+fib(n-2)", tk);
+	tk = parse_statement(p"", tk);
+	tk = parse_statement(p"var i=0", tk);
+	tk = parse_statement(p"while i<10", tk);
+	tk = parse_statement(p" print(i, \" \", fib(i), \"\\n\")", tk);
+	tk = parse_statement(p" i=i+1", tk);
+#elif 0
+	tk = parse_statement(p"def abc(a, b, c)", tk);
+	tk = parse_statement(p" var i=0", tk);
+	tk = parse_statement(p" while i<10", tk);
+	tk = parse_statement(p"  print(a, \",\", b, \",\", c)", tk);
+	tk = parse_statement(p"  chrout(13)", tk);
+	tk = parse_statement(p"  i=i+1", tk);
+	tk = parse_statement(p" return 0", tk);
+	tk = parse_statement(p"abc(1, 2, 3)", tk);
 #endif
 	*tk++ = 0;
 
@@ -52,6 +88,8 @@ int main(void)
 	putch(147); putch(14);
 	edit_refresh_screen();
 
+	// "LOAD SAVE FIND ---- RUN- ---- ---- ---- ----";
+
 	for(;;)
 	{
 		char ch = edit_line();
@@ -61,7 +99,7 @@ int main(void)
 			if (*cursortk)
 			{
 				cursory++;
-				cursortk = cursortk + (format_skip_statement(cursortk) - cursortk);
+				cursortk += token_skip_statement(cursortk);
 			}
 			break;
 		case PETSCII_CURSOR_UP:
@@ -72,7 +110,7 @@ int main(void)
 				char i = 0;
 				while (i < cursory)
 				{
-					cursortk = cursortk + (format_skip_statement(cursortk) - cursortk);
+					cursortk += token_skip_statement(cursortk);
 					i++;
 				}
 			}
@@ -81,21 +119,28 @@ int main(void)
 			if (*cursortk)
 			{
 				cursory++;
-				cursortk = cursortk + (format_skip_statement(cursortk) - cursortk);
+				cursortk += token_skip_statement(cursortk);
 				cursorx = *cursortk - 1;
 			}
 			break;
 		case PETSCII_F5:
 			{
 				putch(147);
+				parse_pretty(tokens);
 				prepare_statements(tokens);
-				while (*exectk && *(volatile char *)0x91 != 0x7f)
-					interpret_statement();
+				while (interpret_statement() && *(volatile char *)0x91 != 0x7f)
+					;
 				restore_statements(tokens);
 				getch();
 				putch(147); putch(14);
+				vic.color_border = VCOL_BLACK;
+				vic.color_back = VCOL_BLACK;
 				edit_refresh_screen();
 			} break;
+		case PETSCII_F6:
+			parse_pretty(tokens);
+			edit_refresh_screen();
+			break;
 		}
 	}
 

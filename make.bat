@@ -1,1 +1,1 @@
-oscar64 ninia.cpp
+oscar64 -g ninia.cpp
