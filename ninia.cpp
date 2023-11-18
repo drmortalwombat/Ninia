@@ -3,7 +3,6 @@
 
 #include <c64/vic.h>
 #include "parser.h"
-#include "dump.h"
 #include "symbols.h"
 #include "formatter.h"
 #include "variables.h"
@@ -59,7 +58,7 @@ int main(void)
 	tk = parse_statement(p"while i<10", tk);
 	tk = parse_statement(p" brace(i)", tk);
 	tk = parse_statement(p" i=i+1", tk);
-#elif 1
+#elif 0
 	tk = parse_statement(p"def fib(n)", tk);
 	tk = parse_statement(p" if n < 2", tk);
 	tk = parse_statement(p"  return 1", tk);
@@ -79,6 +78,22 @@ int main(void)
 	tk = parse_statement(p"  i=i+1", tk);
 	tk = parse_statement(p" return 0", tk);
 	tk = parse_statement(p"abc(1, 2, 3)", tk);
+#elif 1
+	tk = parse_statement(p"def pm(m)", tk);
+	tk = parse_statement(p" var i=0", tk);
+	tk = parse_statement(p" while i<len(m)", tk);
+	tk = parse_statement(p"  var j=0,v=m[i]", tk);
+	tk = parse_statement(p"  while j<len(v)", tk);
+	tk = parse_statement(p"   if j>0", tk);
+	tk = parse_statement(p"    print(\",\")", tk);
+	tk = parse_statement(p"   print(v[j])", tk);
+	tk = parse_statement(p"   j=j+1", tk);
+	tk = parse_statement(p"  print(\"\\n\")", tk);
+	tk = parse_statement(p"  i=i+1", tk);
+	tk = parse_statement(p"", tk);
+	tk = parse_statement(p"pm([[1,2],[3,4],[5,6,7]])", tk);
+
+
 #elif 1
 	tk = parse_statement(p"var a=[]", tk);
 	tk = parse_statement(p"while 1", tk);

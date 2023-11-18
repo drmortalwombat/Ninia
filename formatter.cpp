@@ -108,8 +108,6 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 				const char * ss;			
 				if (tt == TK_IDENT)
 					ss = symbol_string(id);
-				else if (tt == TK_GLOBAL)
-					ss = symbol_string(globals[id].symbol);
 				else 
 					ss = "";
 
@@ -385,7 +383,7 @@ const char * format_statement(const char * tk, char * str, char * col)
 		for(char i=0; i<l; i++)
 		{
 			str[i] = ' ';
-			col[i] = VCOL_LT_BLUE;
+			col[i] = VCOL_DARK_GREY;
 		}
 
 		char t = *tk++;

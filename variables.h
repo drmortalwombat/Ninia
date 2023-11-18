@@ -14,15 +14,13 @@ enum RuntimeError
 
 extern RuntimeError	runtime_error;
 
-struct Variable
-{
-	unsigned	symbol;
-	Value		v;
-};
 
-extern __striped Variable	globals[256];
+extern __striped Value	globals[256];
 
-extern char	num_globals;
+extern unsigned			global_symbols[256];
+extern unsigned			local_symbols[256];
+
+extern char	num_globals, num_local_symbols;
 
 unsigned global_find(unsigned symbol);
 

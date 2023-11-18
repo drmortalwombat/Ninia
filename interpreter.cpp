@@ -38,6 +38,7 @@ unsigned local_find(unsigned symbol)
 
 unsigned local_add(unsigned symbol)
 {
+	local_symbols[num_local_symbols++] = symbol;
 	localvars[num_locals] = symbol;
 	return num_locals++;
 }
@@ -142,8 +143,8 @@ char * prepare_function(char * tk)
 		tk += 2;
 	}
 
-	globals[vi].v.type = TYPE_FUNCTION;
-	globals[vi].v.value = unsigned(tk);
+	globals[vi].type = TYPE_FUNCTION;
+	globals[vi].value = unsigned(tk);
 	functk = tk;
 
 	return tk + 3;
@@ -157,6 +158,7 @@ void prepare_statements(char * tk)
 	csp = 0;
 	num_globals = 0;
 	num_locals = 0;
+	num_local_symbols = 0;
 	functk = nullptr;
 	runtime_error = 0;
 	mem_init();
@@ -166,60 +168,65 @@ void prepare_statements(char * tk)
 	char 	*	pt = nullptr;
 
 	while (l > 0)
-	{		
-		while (l < pl)
-		{
-			char * ppt = (char *)(pt[0] + (pt[1] << 8));
-			pt[0] = (unsigned)tk & 0xff;
-			pt[1] = (unsigned)tk >> 8;
-			pt = ppt;
-			pl--;
-		}
-
-		if (l == 1 && functk)
-		{
-			functk[1] = num_locals;
-			num_locals = 0;
-			functk = nullptr;
-		}
-
-		tk++;
-		char 	t = *tk++;
-		switch (t)
-		{
-		case STMT_EXPRESSION:
-		case STMT_RETURN:
-			tk = prepare_expression(tk, false);
-			break;
-		case STMT_VAR:
-			tk = prepare_expression(tk, true);
-			break;
-		case STMT_DEF:
-			tk[0] = (unsigned)pt & 0xff;
-			tk[1] = (unsigned)pt >> 8;
-			pt = tk;
-			tk = prepare_function(tk + 2);
-			pl++;
-			break;		
-		case STMT_RETURN_NULL:
-		case STMT_NONE:
-			break;
-		case STMT_WHILE:
-		case STMT_IF:
-		case STMT_ELSIF:
-			tk[0] = (unsigned)pt & 0xff;
-			tk[1] = (unsigned)pt >> 8;
-			pt = tk;
-			tk = prepare_expression(tk + 2, false);
-			pl++;
-			break;		
-		case STMT_ELSE:
-			tk[0] = (unsigned)pt & 0xff;
-			tk[1] = (unsigned)pt >> 8;
-			pt = tk;
+	{	
+		if (tk[1] == STMT_NONE)		
 			tk += 2;
-			pl++;
-			break;					
+		else
+		{
+			while (l < pl)
+			{
+				char * ppt = (char *)(pt[0] + (pt[1] << 8));
+				pt[0] = (unsigned)tk & 0xff;
+				pt[1] = (unsigned)tk >> 8;
+				pt = ppt;
+				pl--;
+			}
+
+			if (l == 1 && functk)
+			{
+				functk[1] = num_locals;
+				num_locals = 0;
+				functk = nullptr;
+			}
+
+			tk++;
+			char 	t = *tk++;
+			switch (t)
+			{
+			case STMT_EXPRESSION:
+			case STMT_RETURN:
+				tk = prepare_expression(tk, false);
+				break;
+			case STMT_VAR:
+				tk = prepare_expression(tk, true);
+				break;
+			case STMT_DEF:
+				tk[0] = (unsigned)pt & 0xff;
+				tk[1] = (unsigned)pt >> 8;
+				pt = tk;
+				tk = prepare_function(tk + 2);
+				pl++;
+				break;		
+			case STMT_RETURN_NULL:
+			case STMT_NONE:
+				break;
+			case STMT_WHILE:
+			case STMT_IF:
+			case STMT_ELSIF:
+				tk[0] = (unsigned)pt & 0xff;
+				tk[1] = (unsigned)pt >> 8;
+				pt = tk;
+				tk = prepare_expression(tk + 2, false);
+				pl++;
+				break;		
+			case STMT_ELSE:
+				tk[0] = (unsigned)pt & 0xff;
+				tk[1] = (unsigned)pt >> 8;
+				pt = tk;
+				tk += 2;
+				pl++;
+				break;					
+			}
 		}
 		l = *tk;
 	}
@@ -237,15 +244,19 @@ void prepare_statements(char * tk)
 char * restore_expression(char * tk, bool var)
 {
 	char 	t = *tk;
+	bool	left = true;
+
 	while (t != TK_END)
 	{
 		switch (t & 0xf0)
 		{
 		case TK_SMALL_INT:
 			tk += 2;
+			left = false;
 			break;
 		case TK_NUMBER:
 			tk += 5;
+			left = false;
 			break;
 
 		case TK_IDENT:
@@ -257,30 +268,45 @@ char * restore_expression(char * tk, bool var)
 				unsigned ti = ((t & 0x0f) << 8) | tk[1];
 				if (tt == TK_GLOBAL)
 				{
-					unsigned vi = globals[ti].symbol;
+					unsigned vi = global_symbols[ti];
 					tk[0] = (vi >> 8) | TK_IDENT;
 					tk[1] = vi & 0xff;
 				}
 				else if (tt == TK_LOCAL)
 				{
-					unsigned vi = localvars[ti];
+					unsigned	vi;
+					if (left && var)
+					{
+						vi = local_symbols[num_local_symbols++];
+						localvars[ti] = vi;
+					}
+					else
+						vi = localvars[ti];
+
 					tk[0] = (vi >> 8) | TK_IDENT;
 					tk[1] = vi & 0xff;					
 				}
 			tk += 2;
-			}	break;
+			left = false;
+			}	break;			
 
 		case TK_POSTFIX:
 		case TK_STRUCTURE:
 			tk += 2;
+			left = false;
 			break;
 
 		case TK_CONTROL:
 			{
 				switch (t)
 				{
+				case TK_COMMA:
+					tk++;
+					left = true;
+					break;
 				case TK_STRING:
 					tk += tk[1] + 2;
+					left = false;
 					break;
 				default:
 					tk++;
@@ -289,6 +315,7 @@ char * restore_expression(char * tk, bool var)
 
 		default:
 			tk++;
+			left = false;
 		}
 		t = *tk;
 	}
@@ -319,47 +346,52 @@ void restore_statements(char * tk)
 {
 	num_locals = 0;
 	functk = nullptr;	
+	num_local_symbols = 0;
 
 	char	l = *tk;
 	while (l > 0)
 	{		
-		if (l == 1 && functk)
-		{
-			num_locals = 0;
-			functk = nullptr;
-		}
-
 		tk++;
 		char 	t = *tk++;
-		switch (t)
+
+		if (t != STMT_NONE)
 		{
-		case STMT_EXPRESSION:
-		case STMT_RETURN:
-			tk = restore_expression(tk, false);
-			break;
-		case STMT_VAR:
-			tk = restore_expression(tk, true);
-			break;
-		case STMT_RETURN_NULL:
-		case STMT_NONE:
-			break;
-		case STMT_WHILE:
-		case STMT_IF:
-		case STMT_ELSIF:
-			tk[0] = 0;
-			tk[1] = 0;
-			tk = restore_expression(tk + 2, false);
-			break;		
-		case STMT_ELSE:
-			tk[0] = 0;
-			tk[1] = 0;
-			tk += 2;
-			break;			
-		case STMT_DEF:
-			tk[0] = 0;
-			tk[1] = 0;
-			tk = restore_function(tk + 2);
-			break;				
+			if (l == 1 && functk)
+			{
+				num_locals = 0;
+				functk = nullptr;
+			}
+
+			switch (t)
+			{
+			case STMT_EXPRESSION:
+			case STMT_RETURN:
+				tk = restore_expression(tk, false);
+				break;
+			case STMT_VAR:
+				tk = restore_expression(tk, true);
+				break;
+			case STMT_RETURN_NULL:
+			case STMT_NONE:
+				break;
+			case STMT_WHILE:
+			case STMT_IF:
+			case STMT_ELSIF:
+				tk[0] = 0;
+				tk[1] = 0;
+				tk = restore_expression(tk + 2, false);
+				break;		
+			case STMT_ELSE:
+				tk[0] = 0;
+				tk[1] = 0;
+				tk += 2;
+				break;			
+			case STMT_DEF:
+				tk[0] = 0;
+				tk[1] = 0;
+				tk = restore_function(tk + 2);
+				break;				
+			}
 		}
 		l = *tk;
 	}	
@@ -371,7 +403,7 @@ void valderef(char at)
 	switch (estack[ei].type)
 	{
 	case TYPE_GLOBAL_REF:
-		estack[ei] = globals[(char)(estack[ei].value)].v;
+		estack[ei] = globals[(char)(estack[ei].value)];
 		break;
 	case TYPE_LOCAL_REF:
 		estack[ei] = estack[(char)(efp - estack[ei].value)];
@@ -426,7 +458,7 @@ void valassign(void)
 	switch (estack[esp + 1].type)
 	{
 	case TYPE_GLOBAL_REF:
-		globals[(char)(estack[esp + 1].value)].v = estack[esp];
+		globals[(char)(estack[esp + 1].value)] = estack[esp];
 		break;
 	case TYPE_LOCAL_REF:
 		estack[(char)(efp - estack[esp + 1].value)] = estack[esp];
