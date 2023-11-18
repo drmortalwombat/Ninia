@@ -5,6 +5,7 @@ static char * const Color = (char *)0xd800;
 
 extern char cursorx, cursory, screenx;
 extern char * screentk, * cursortk, * endtk;
+extern unsigned screeny;
 
 const char * edit_display_line(char y, const char * tk);
 

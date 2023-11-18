@@ -138,6 +138,14 @@ char * parse_expression(const char * str, char * tk)
 			c = *str++;
 			prefix = true;
 			break;
+		case '[':
+			if (prefix)
+				ostack[osp++] = TK_ARRAY;
+			else
+				ostack[osp++] = TK_INDEX;
+			c = *str++;
+			prefix = true;
+			break;
 		case ')':
 		case ']':
 		case '}':			

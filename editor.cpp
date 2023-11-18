@@ -24,6 +24,7 @@ static inline char s2p(char ch)
 
 char cursorx, cursory, screenx;
 char * screentk, * cursortk, * endtk;
+unsigned screeny;
 
 const char * edit_display_line(char y, const char * tk)
 {
@@ -55,12 +56,8 @@ const char * edit_display_line(char y, const char * tk)
 void edit_refresh_screen(void)
 {
 	const char * ctk = screentk;
-	char y = 0;
-	while (*ctk)
-	{
+	for(char y = 0; y<25; y++)
 		ctk = edit_display_line(y, ctk);
-		y++;
-	}	
 }
 
 char	ebuffer[200], ecbuffer[200];
@@ -116,6 +113,10 @@ char edit_line(void)
 	char i = 0;
 	while (ebuffer[i])
 		i++;
+
+	if (cursorx > i)
+		cursorx = i;
+
 	while (i < 200)
 	{
 		ebuffer[i] = ' ';
@@ -148,17 +149,24 @@ char edit_line(void)
 			{
 			case PETSCII_CURSOR_LEFT:
 				if (cursorx > 0)
+				{
 					cursorx--;
+					ch = 0;
+				}
 				break;
 			case PETSCII_CURSOR_RIGHT:
 				if (ebuffer[cursorx])
+				{
 					cursorx++;
+					ch = 0;
+				}
 				break;
 			case 95:
 				i = 199;
 				while (i > 0 && ebuffer[i - 1] == ' ')
 					i--;
 				cursorx = i;
+				ch = 0;
 				break;
 			case PETSCII_HOME:
 				i = 0;
@@ -168,6 +176,7 @@ char edit_line(void)
 					cursorx = 0;
 				else
 					cursorx = i;
+				ch = 0;
 				break;
 
 			case PETSCII_DEL:
@@ -182,28 +191,11 @@ char edit_line(void)
 						i++;
 					}
 					redraw = true;
-				}
-				else
-				{
-					if (edit_length() == 0)
-					{
-						memmove(cursortk, cursortk + psz, endtk - (cursortk + psz));
-						endtk -= psz;
-						if (upy >= cursory)
-						{
-							upy = cursory;
-							uptk = cursortk;
-						}
-
-						while (upy < 25)
-						{
-							uptk = edit_display_line(upy, uptk);
-							upy++;
-						}
-						return ch;						
-					}
+					ch = 0;
 				}
 				break;
+
+			case 25:
 			case PETSCII_CURSOR_UP:
 			case PETSCII_CURSOR_DOWN:
 			case '\n':
@@ -215,58 +207,7 @@ char edit_line(void)
 			case PETSCII_F6:
 			case PETSCII_F7:
 			case PETSCII_F8:
-				{
-					i = edit_length();
-					ebuffer[i] = 0;
-
-					int nsz = parse_statement(ebuffer, buffer) - buffer;
-
-					if (ch == '\n')
-					{
-						if (upy > cursory)
-						{
-							upy = cursory;
-							uptk = cursortk;
-						}
-
-						if (cursorx < buffer[0])
-						{
-							cursortk[0] = buffer[0];
-							cursortk[1] = STMT_NONE;
-							cursortk += 2;
-							cursory++;
-							psz-=2;
-							ch = ' ';
-						}
-						else
-						{
-							buffer[nsz++] = buffer[0];
-							buffer[nsz++] = STMT_NONE;							
-						}
-					}
-					else
-					{
-						if (upy < 25 && upy > cursory)
-						{
-							upy = cursory;
-							uptk = cursortk;
-						}
-					}
-
-					memmove(cursortk + nsz, cursortk + psz, endtk - (cursortk + psz));
-					memcpy(cursortk, buffer, nsz);
-					endtk += nsz - psz;
-
-					if (upy > cursory)
-						edit_display_line(cursory, cursortk);
-
-					while (upy < 25)
-					{
-						uptk = edit_display_line(upy, uptk);
-						upy++;
-					}
-					return ch;
-				} break;
+				break;
 			default:
 				if (ch >= ' ' && ch <= 127 || ch >= 160)
 				{
@@ -282,23 +223,98 @@ char edit_line(void)
 					cursorx++;
 					redraw = true;
 				}
+				ch = 0;
+				break;
+			}
+
+			if (ch)
+			{
+				i = edit_length();
+				ebuffer[i] = 0;
+
+				int nsz = parse_statement(ebuffer, buffer) - buffer;
+
+				if (ch == '\n')
+				{
+					if (upy > cursory)
+					{
+						upy = cursory;
+						uptk = cursortk;
+					}
+
+					if (cursorx < buffer[0])
+					{
+						cursortk[0] = buffer[0];
+						cursortk[1] = STMT_NONE;
+						cursortk += 2;
+						cursory++;
+						psz-=2;
+						ch = ' ';
+					}
+					else
+					{
+						buffer[nsz++] = buffer[0];
+						buffer[nsz++] = STMT_NONE;							
+					}
+				}
+				else
+				{
+					if (upy < 25 && upy > cursory)
+					{
+						upy = cursory;
+						uptk = cursortk;
+					}
+				}
+
+				memmove(cursortk + nsz, cursortk + psz, endtk - (cursortk + psz));
+				memcpy(cursortk, buffer, nsz);
+				endtk += nsz - psz;
+
+				if (upy > cursory)
+					edit_display_line(cursory, cursortk);
+
+				while (upy < 25)
+				{
+					uptk = edit_display_line(upy, uptk);
+					upy++;
+				}
+				return ch;
 			}
 
 			if (screenx > 0 && cursorx < screenx + 5)
 			{
-				scroll_right();
-				screenx--;
-				dp[0] = p2s(ebuffer[screenx]);
-				cp[0] = ecbuffer[screenx];
+				if (cursorx == screenx + 4)
+				{
+					scroll_right();
+					screenx--;
+					dp[0] = p2s(ebuffer[screenx]);
+					cp[0] = ecbuffer[screenx];
+				}
+				else
+				{
+					if (cursorx > 5)
+						screenx = cursorx - 5;
+					else
+						screenx = 0;
+					redraw = true;
+				}
 				upy = 0;
 				uptk = screentk;
 			}
 			else if (cursorx > screenx + 35)
 			{
-				scroll_left();
-				screenx++;
-				dp[39] = p2s(ebuffer[screenx + 39]);
-				cp[39] = ecbuffer[screenx + 39];
+				if (cursorx == screenx + 36)
+				{
+					scroll_left();
+					screenx++;
+					dp[39] = p2s(ebuffer[screenx + 39]);
+					cp[39] = ecbuffer[screenx + 39];
+				}
+				else
+				{
+					screenx = cursorx - 35;
+					redraw = true;
+				}
 				upy = 0;
 				uptk = screentk;
 			}

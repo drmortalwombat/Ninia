@@ -89,17 +89,30 @@
 #define STMT_RETURN			0x24
 #define STMT_RETURN_NULL	0x25
 
-#define TYPE_NULL			0x01
-#define TYPE_NUMBER			0x02
-#define TYPE_SYMBOL			0x04
-#define TYPE_FUNCTION		0x08
-#define TYPE_ARRAY			0x10
-#define TYPE_STRING			0x20
-#define TYPE_STRUCT			0x40
 
-#define TYPE_GLOBAL_REF		0x80
-#define TYPE_LOCAL_REF		0x81
-#define TYPE_ARRAY_REF		0x82
+#define TYPE_NUMBER			0x08
+#define TYPE_STRING			0x10
+#define TYPE_COMPLEX		0x20
+
+#define TYPE_MASK			0x38
+
+#define TYPE_HEAP			0x40
+#define TYPE_REF 			0x80
+
+#define TYPE_STRING_SHORT	(TYPE_STRING | 0)
+#define TYPE_STRING_LITERAL	(TYPE_STRING | 1)
+#define TYPE_STRING_HEAP	(TYPE_STRING | TYPE_HEAP)
+
+#define TYPE_NULL			(TYPE_COMPLEX | 0)
+#define TYPE_SYMBOL			(TYPE_COMPLEX | 1)
+#define TYPE_FUNCTION		(TYPE_COMPLEX | 2)
+
+#define TYPE_ARRAY			(TYPE_COMPLEX | 0 | TYPE_HEAP)
+#define TYPE_STRUCT			(TYPE_COMPLEX | 1 | TYPE_HEAP)
+
+#define TYPE_GLOBAL_REF		(TYPE_REF | 0)
+#define TYPE_LOCAL_REF		(TYPE_REF | 1)
+#define TYPE_ARRAY_REF		(TYPE_REF | 2 | TYPE_HEAP)
 
 struct Value
 {

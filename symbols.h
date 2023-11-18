@@ -14,6 +14,14 @@ void symbols_init(void);
 #define RTSYM_POKE		0x104
 #define RTSYM_PEEK		0x105
 
+#define RTSYM_LEN		0x106
+#define RTSYM_CAT		0x107
+#define RTSYM_CHR		0x108
+#define RTSYM_SEG		0x109
+#define RTSYM_ARRAY		0x10a
+#define RTSYM_PUSH		0x10b
+#define RTSYM_POP		0x10c
+
 unsigned symbol_add(const char * s);
 
 const char * symbol_string(unsigned id);

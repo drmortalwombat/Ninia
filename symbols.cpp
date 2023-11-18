@@ -14,7 +14,16 @@ const char *	rtsymbols[]  =
 	p"chrout",
 	p"print",
 	p"poke",
-	p"peek"
+	p"peek",
+
+	p"len",
+	p"cat",
+	p"chr",
+	p"seg",
+	p"array",
+	p"push",
+	p"pop",
+
 };
 
 #define NUM_RTSYMBOLS	(sizeof(rtsymbols) / sizeof(char *))
