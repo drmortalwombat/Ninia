@@ -63,9 +63,8 @@
 #define TK_NEGATE			(TK_PREFIX + 0)
 #define TK_NOT				(TK_PREFIX + 1)
 
-#define TK_DOT				(TK_POSTFIX + 0)
-#define TK_INDEX			(TK_POSTFIX + 1)
-#define TK_INVOKE			(TK_POSTFIX + 2)
+#define TK_INDEX			(TK_POSTFIX + 0)
+#define TK_INVOKE			(TK_POSTFIX + 1)
 
 #define TK_LIST				(TK_STRUCTURE + 0)
 #define TK_ARRAY			(TK_STRUCTURE + 1)
@@ -74,7 +73,10 @@
 #define TK_END				(TK_CONTROL + 0)
 #define TK_COMMA			(TK_CONTROL + 1)
 #define TK_STRING			(TK_CONTROL + 2)
+#define TK_DOT				(TK_CONTROL + 3)
+#define TK_COLON			(TK_CONTROL + 4)
 
+#define STMT_END			0x00
 #define STMT_ERROR			0x01
 #define STMT_NONE			0x02
 
@@ -113,6 +115,7 @@
 #define TYPE_GLOBAL_REF		(TYPE_REF | 0)
 #define TYPE_LOCAL_REF		(TYPE_REF | 1)
 #define TYPE_ARRAY_REF		(TYPE_REF | 2 | TYPE_HEAP)
+#define TYPE_STRUCT_REF		(TYPE_REF | 3 | TYPE_HEAP)
 
 struct Value
 {

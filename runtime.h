@@ -2,19 +2,6 @@
 
 #include "tokens.h"
 
-enum RuntimeError
-{
-	RERR_OK,
-	RERR_INVALID_TYPES,
-	RERR_STACK_UNDERFLOW,
-	RERR_UNDEFINED_SYMBOL,
-	RERR_OUT_OF_MEMORY,
-	RERR_INVALID_ASSIGN
-};
-
-extern RuntimeError	runtime_error;
-
-
 extern __striped Value	globals[256];
 
 extern unsigned			global_symbols[256];
@@ -43,6 +30,14 @@ struct MemArray : MemHead
 	unsigned	size;
 };
 
+struct MemDict : MemHead
+{
+	MemHead	*	mh;
+	char		size;
+	unsigned	symbols[0];
+};
+
+
 struct MemValues : MemHead
 {
 	unsigned	capacity;
@@ -56,6 +51,7 @@ void mem_collect(void);
 #define MEM_STRING		0x01
 #define MEM_ARRAY		0x02
 #define MEM_VALUES		0x03
+#define MEM_DICT		0x04
 
 #define MEM_TYPE		0x0f
 
@@ -65,4 +61,4 @@ void mem_collect(void);
 
 MemHead * mem_allocate(char type, unsigned size);
 
-#pragma compile("variables.cpp")
+#pragma compile("runtime.cpp")

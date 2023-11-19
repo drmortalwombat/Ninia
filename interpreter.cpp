@@ -1,7 +1,7 @@
 #include "interpreter.h"
-#include "variables.h"
 #include "tokens.h"
 #include "symbols.h"
+#include "errors.h"
 #include <fixmath.h>
 
 __striped Value		estack[VALUE_STACK_SIZE];
@@ -114,6 +114,11 @@ char * prepare_expression(char * tk, bool var)
 					break;
 				case TK_STRING:
 					tk += tk[1] + 2;
+					left = false;
+					break;
+				case TK_COLON:
+				case TK_DOT:
+					tk++;
 					left = false;
 					break;
 				default:
@@ -308,6 +313,11 @@ char * restore_expression(char * tk, bool var)
 					tk += tk[1] + 2;
 					left = false;
 					break;
+				case TK_COLON:
+				case TK_DOT:
+					tk++;
+					left = false;
+					break;
 				default:
 					tk++;
 				}
@@ -397,6 +407,19 @@ void restore_statements(char * tk)
 	}	
 }
 
+char struct_index(MemDict * md, unsigned sym)
+{
+	char sz = md->size;
+	__assume(sz < 64);
+	while (sz > 0)
+	{
+		sz--;
+		if (md->symbols[sz] == sym)
+			return sz;
+	}
+	return 0xff;
+}
+
 void valderef(char at)
 {
 	char ei = esp + at;
@@ -414,6 +437,17 @@ void valderef(char at)
 			MemValues	*	mv = (MemValues *)ma->mh;
 			unsigned		mi = estack[ei].value >> 16;
 			estack[ei] = mv->values[mi];
+		} break;
+	case TYPE_STRUCT_REF:
+		{
+			MemDict		*	md = (MemDict *)(unsigned)estack[ei].value;
+			MemValues	*	mv = (MemValues *)md->mh;
+			unsigned		ms = estack[ei].value >> 16;
+			char			mi = struct_index(md, ms);
+			if (mi != 0xff)
+				estack[ei] = mv->values[mi];
+			else
+				estack[ei].type = TYPE_NULL;
 		} break;
 	}
 }
@@ -470,6 +504,17 @@ void valassign(void)
 			unsigned		mi = estack[esp + 1].value >> 16;
 			mv->values[mi] = estack[esp];
 		} break;
+	case TYPE_STRUCT_REF:
+		{
+			MemDict		*	md = (MemDict *)(unsigned)estack[esp + 1].value;
+			MemValues	*	mv = (MemValues *)md->mh;
+			unsigned		ms = estack[esp + 1].value >> 16;
+			char			mi = struct_index(md, ms);
+			if (mi != 0xff)
+				mv->values[mi] = estack[esp];
+			else
+				runtime_error = RERR_UNDEFINED_SYMBOL;
+		} break;
 	default:
 		runtime_error = RERR_INVALID_ASSIGN;
 	}
@@ -520,6 +565,24 @@ MemValues * values_allocate(unsigned size, unsigned capacity)
 
 	return v;
 }
+
+MemDict * dict_allocate(char size)
+{
+	MemDict	*	d = (MemDict *)mem_allocate(MEM_DICT, sizeof(MemDict) + sizeof(MemValues) + size * (sizeof(MemValues) + sizeof(unsigned)));
+	if (d)
+	{
+		MemValues	*	v = (MemValues *)(d->symbols + size);
+
+		d->mh = v;
+		d->size = size;
+
+		v->type = MEM_VALUES;
+		v->capacity = size;
+	}
+
+	return d;
+}
+
 
 MemArray * array_allocate(unsigned size, unsigned capacity)
 {
@@ -978,8 +1041,6 @@ bool interpret_expression(void)
 					estack[esp].value |= ei & 0xffff0000ul;
 					break;
 				}
-			case TK_DOT:
-				break;
 			case TK_INVOKE:
 				{
 					char n = tk[ti++];
@@ -1055,7 +1116,21 @@ bool interpret_expression(void)
 						valpush(TYPE_ARRAY, (unsigned)ma);
 					} break;
 				case TK_STRUCT:
-					break;
+					{
+						MemDict		*	md = dict_allocate(n);
+						MemValues	*	mv = (MemValues *)(md->mh);
+
+						for(char i=0; i<n; i++)
+						{
+							char ei = 2 * (n - i - 1);
+							valderef(ei);
+							valderef(ei + 1);
+							md->symbols[i] = estack[esp + ei + 1].value;
+							mv->values[i] = estack[esp + ei];
+						}
+						esp += 2 * n;
+						valpush(TYPE_STRUCT, (unsigned)md);
+					} break;
 				}
 			}	break;
 
@@ -1068,6 +1143,15 @@ bool interpret_expression(void)
 					return true;
 				case TK_COMMA:
 					esp++;
+					break;
+				case TK_COLON:
+					break;
+				case TK_DOT:
+					valderef(0);
+					unsigned long ei = valpop();
+					valderef(0);
+					estack[esp].type = TYPE_STRUCT_REF;
+					estack[esp].value |= ei << 16;
 					break;
 				case TK_STRING:
 					valpush(TYPE_STRING_LITERAL, (unsigned)(tk + ti));

@@ -1,15 +1,20 @@
 #pragma once
 
-static char * const Screen = (char *)0x0400;
-static char * const Color = (char *)0xd800;
+extern char * starttk, * limittk;
 
 extern char cursorx, cursory, screenx;
 extern char * screentk, * cursortk, * endtk;
 extern unsigned screeny;
 
+extern char	buffer[200], cbuffer[200];
+
+void edit_init(void);
+
 const char * edit_display_line(char y, const char * tk);
 
 void edit_refresh_screen(void);
+
+void edit_show_status(void);
 
 char edit_line(void);
 

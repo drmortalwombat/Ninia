@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "errors.h"
 
 bool is_letter(char c)
 {
@@ -50,18 +51,29 @@ char oppri(char op)
 	case TK_POSTFIX:
 		return 0x80;
 
-	case TK_END:
-		return 0x7f;
-	case TK_COMMA:
-		return 40;
 	case TK_STRUCTURE:
 		return 0x80;
+	case TK_CONTROL:
+		switch (op)
+		{
+		case TK_END:
+			return 0x7f;
+		case TK_COLON:
+			return 1;
+		case TK_DOT:
+			return 4;
+		case TK_COMMA:
+			return 0x7f;
+		default:
+			return 0xff;
+		}
+		break;
 	default:
 		return 0xff;
 	}
 }
 
-char * parse_op(char op, char * tk)
+char * parse_op(char * tk, char op)
 {
 	char pri = oppri(op);
 	while (osp && oppri(ostack[osp-1]) <= pri)
@@ -121,7 +133,7 @@ char * parse_expression(const char * str, char * tk)
 		switch (c)
 		{
 		case '\0':
-			tk = parse_op(TK_END, tk);
+			tk = parse_op(tk, TK_END);
 			if (osp != 1)
 				return nullptr;
 			*tk++ = TK_END;
@@ -146,9 +158,16 @@ char * parse_expression(const char * str, char * tk)
 			c = *str++;
 			prefix = true;
 			break;
+		case '{':
+		case 219:
+			ostack[osp++] = TK_STRUCT;
+			c = *str++;
+			prefix = true;
+			break;
 		case ')':
 		case ']':
-		case '}':			
+		case '}':
+		case 221:
 			tk = close_op(tk, prefix);
 			c = *str++;
 			prefix = false;
@@ -158,40 +177,45 @@ char * parse_expression(const char * str, char * tk)
 			c = *str++;
 			prefix = true;
 			break;
+		case ':':
+			tk = parse_op(tk, TK_COLON);
+			c = *str++;
+			prefix = true;
+			break;
 		case '+':
 			if (prefix)
 				return nullptr;
 
-			tk = parse_op(TK_ADD, tk);
+			tk = parse_op(tk, TK_ADD);
 			c = *str++;
 			prefix = true;
 			break;
 		case '-':
 			if (prefix)
-				tk = parse_op(TK_NEGATE, tk);
+				tk = parse_op(tk, TK_NEGATE);
 			else
-				tk = parse_op(TK_SUB, tk);
+				tk = parse_op(tk, TK_SUB);
 
 			c = *str++;
 			prefix = true;
 			break;
 		case '*':
-			tk = parse_op(TK_MUL, tk);
+			tk = parse_op(tk, TK_MUL);
 			c = *str++;
 			prefix = true;
 			break;
 		case '/':
-			tk = parse_op(TK_DIV, tk);
+			tk = parse_op(tk, TK_DIV);
 			c = *str++;
 			prefix = true;
 			break;
 		case '%':
-			tk = parse_op(TK_MOD, tk);
+			tk = parse_op(tk, TK_MOD);
 			c = *str++;
 			prefix = true;
 			break;
 		case '.':
-			tk = parse_op(TK_DOT, tk);
+			tk = parse_op(tk, TK_DOT);
 			c = *str++;
 			prefix = true;
 			break;
@@ -199,54 +223,54 @@ char * parse_expression(const char * str, char * tk)
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(TK_NOT_EQUAL, tk);
+				tk = parse_op(tk, TK_NOT_EQUAL);
 				c = *str++;
 			}
 			else
-				tk = parse_op(TK_NOT, tk);
+				tk = parse_op(tk, TK_NOT);
 			prefix = true;
 			break;
 		case '=':
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(TK_EQUAL, tk);
+				tk = parse_op(tk, TK_EQUAL);
 				c = *str++;
 			}
 			else
-				tk = parse_op(TK_ASSIGN, tk);
+				tk = parse_op(tk, TK_ASSIGN);
 			prefix = true;
 			break;
 		case '<':
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(TK_LESS_EQUAL, tk);
+				tk = parse_op(tk, TK_LESS_EQUAL);
 				c = *str++;
 			}
 			else if (c == '<')
 			{
-				tk = parse_op(TK_SHL, tk);
+				tk = parse_op(tk, TK_SHL);
 				c = *str++;
 			}
 			else
-				tk = parse_op(TK_LESS_THAN, tk);
+				tk = parse_op(tk, TK_LESS_THAN);
 			prefix = true;
 			break;
 		case '>':
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(TK_GREATER_EQUAL, tk);
+				tk = parse_op(tk, TK_GREATER_EQUAL);
 				c = *str++;
 			}
 			else if (c == '>')
 			{
-				tk = parse_op(TK_SHR, tk);
+				tk = parse_op(tk, TK_SHR);
 				c = *str++;
 			}
 			else
-				tk = parse_op(TK_GREATER_THAN, tk);
+				tk = parse_op(tk, TK_GREATER_THAN);
 			prefix = true;
 			break;
 		case '"':
@@ -453,7 +477,9 @@ char * parse_statement(const char * str, char * tk)
 		tk = parse_expression(str, tk);
 	}
 
-	if (!tk)
+	if (tk)
+		runtime_error = RERR_OK;
+	else
 	{
 		etk[1] = STMT_ERROR;
 		i = 0;
@@ -464,6 +490,7 @@ char * parse_statement(const char * str, char * tk)
 		}
 		etk[2] = i;
 		tk = etk + 3 + i;
+		runtime_error = RERR_SYNTAX;
 	}
 
 	return tk;

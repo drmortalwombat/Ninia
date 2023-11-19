@@ -1,15 +1,15 @@
 #include "editor.h"
 #include "formatter.h"
+#include "system.h"
 #include <c64/vic.h>
 #include <stdio.h>
 #include <conio.h>
 #include "tokens.h"
+#include "errors.h"
 
 char	buffer[200], cbuffer[200];
 
-//static char p2smap[] = {0x00, 0x20, 0x00, 0x40, 0x00, 0x60, 0x40, 0x60};
 static char p2smap[] = {0x00, 0x00, 0x40, 0x20, 0x80, 0xc0, 0x80, 0x80};
-//static char s2pmap[] = {0x40, 0x20, 0x60, 0xa0, 0x40, 0x20, 0x60, 0xa0};
 static char s2pmap[] = {0x40, 0x00, 0x20, 0xc0, 0xc0, 0x80, 0xa0, 0x40};
 
 static inline char p2s(char ch)
@@ -24,7 +24,23 @@ static inline char s2p(char ch)
 
 char cursorx, cursory, screenx;
 char * screentk, * cursortk, * endtk;
+char * starttk, * limittk;
 unsigned screeny;
+
+char tokens[4096];
+
+void edit_init(void)
+{
+	starttk = tokens;
+	endtk = starttk;
+	screentk = cursortk = starttk;
+	cursorx = 0;
+	cursory = 0;
+	screenx = 0;
+	screeny = 0;
+	*endtk++ = TK_END;
+	limittk = starttk + 4096;
+}
 
 const char * edit_display_line(char y, const char * tk)
 {
@@ -56,7 +72,7 @@ const char * edit_display_line(char y, const char * tk)
 void edit_refresh_screen(void)
 {
 	const char * ctk = screentk;
-	for(char y = 0; y<25; y++)
+	for(char y = 0; y<24; y++)
 		ctk = edit_display_line(y, ctk);
 }
 
@@ -67,7 +83,7 @@ void scroll_left(void)
 	char * dp = Screen;
 	char * cp = Color;
 
-	for(char y=0; y<25; y++)
+	for(char y=0; y<24; y++)
 	{
 		for(char x=0; x<39; x++)
 		{
@@ -85,7 +101,7 @@ void scroll_right(void)
 	char * dp = Screen;
 	char * cp = Color;
 
-	for(char y=0; y<25; y++)
+	for(char y=0; y<24; y++)
 	{
 		for(signed char x=38; x>=0; x--)
 		{
@@ -127,14 +143,14 @@ char edit_line(void)
 	char * dp = Screen + 40 * cursory;
 	char * cp = Color + 40 * cursory;
 
-	char upy = 25;
+	char upy = 24;
 	const char * uptk = screentk;
 	for(;;)
 	{
 		dp[cursorx - screenx] |= 0x80;
 
 		char ch;
-		if (upy != 25)
+		if (upy != 24)
 			ch = getchx();
 		else
 			ch = getch();
@@ -259,7 +275,7 @@ char edit_line(void)
 				}
 				else
 				{
-					if (upy < 25 && upy > cursory)
+					if (upy < 24 && upy > cursory)
 					{
 						upy = cursory;
 						uptk = cursortk;
@@ -273,7 +289,7 @@ char edit_line(void)
 				if (upy > cursory)
 					edit_display_line(cursory, cursortk);
 
-				while (upy < 25)
+				while (upy < 24)
 				{
 					uptk = edit_display_line(upy, uptk);
 					upy++;
@@ -328,7 +344,7 @@ char edit_line(void)
 				}
 			}
 		}
-		else if (upy < 25)
+		else if (upy < 24)
 		{
 			if (upy != cursory)
 				uptk = edit_display_line(upy, uptk);
@@ -339,3 +355,64 @@ char edit_line(void)
 	}
 }
 
+
+void edit_show_status(void)
+{
+	const char * err = runtime_error_names[runtime_error];
+
+	char * dp = Screen + 24 * 40;
+	char * cp = Color + 24 * 40;
+
+	char color = VCOL_LT_BLUE;
+	if (runtime_error)
+		color = VCOL_ORANGE;
+
+	char i = 0;
+	while (err[i])
+	{
+		dp[i] = p2s(err[i]) | 0x80;
+		cp[i] = color;
+		i++;
+	}
+	while (i < 30)
+	{
+		dp[i] = 160;
+		cp[i] = color;
+		i++;		
+	}
+
+	char str[6];
+	utoa(cursory + screeny + 1, str, 10);
+	char j = 0;
+	while (str[j])
+	{
+		dp[i] = str[j] | 0x80;
+		cp[i] = color;
+		i++;
+		j++;
+	}
+
+	while (i < 35)
+	{
+		dp[i] = 160;
+		cp[i] = color;
+		i++;		
+	}
+
+	utoa(limittk - endtk, str, 10);
+	j = 0;
+	while (str[j])
+	{
+		dp[i] = str[j] | 0x80;
+		cp[i] = color;
+		i++;
+		j++;
+	}
+
+	while (i < 40)
+	{
+		dp[i] = 160;
+		cp[i] = color;
+		i++;		
+	}
+}

@@ -5,23 +5,22 @@
 #include "parser.h"
 #include "symbols.h"
 #include "formatter.h"
-#include "variables.h"
+#include "runtime.h"
 #include "interpreter.h"
 #include "editor.h"
+#include "system.h"
+#include "errors.h"
 #include <conio.h>
-
-char tokens[1024];
+#include <c64/kernalio.h>
 
 int main(void)
 {
-	clrscr();
-
-	vic.color_border = VCOL_BLACK;
-	vic.color_back = VCOL_BLACK;
+	system_init();
 
 	symbols_init();
 
-	char * tk = tokens;
+	edit_init();
+	char * tk = starttk;
 
 #if 0
 	tk = parse_statement(p"var x = 0", tk);
@@ -78,6 +77,10 @@ int main(void)
 	tk = parse_statement(p"  i=i+1", tk);
 	tk = parse_statement(p" return 0", tk);
 	tk = parse_statement(p"abc(1, 2, 3)", tk);
+#elif 1
+	tk = parse_statement(p"var a={x:1,y:2}", tk);
+	tk = parse_statement(p"", tk);
+	tk = parse_statement(p"print(a.x, \" \", a.y)", tk);
 #elif 1
 	tk = parse_statement(p"def pm(m)", tk);
 	tk = parse_statement(p" var i=0", tk);
@@ -151,13 +154,10 @@ int main(void)
 	tk = parse_statement(p" i=i+1", tk);
 	tk = parse_statement(p"", tk);
 #endif
-	*tk++ = 0;
-
-	screentk = cursortk = tokens;
+	*tk++ = STMT_END;
 	endtk = tk;
-	cursorx = cursory = screenx = 0;
 
-	putch(147); putch(14);
+	system_show_editor();
 	edit_refresh_screen();
 
 	// "LOAD SAVE FIND ---- RUN- ---- ---- ---- ----";
@@ -166,6 +166,7 @@ int main(void)
 	{
 		bool	redraw = false;
 
+		edit_show_status();
 		char ch = edit_line();
 		switch (ch)
 		{
@@ -174,7 +175,7 @@ int main(void)
 				cursory++;
 			break;
 		case PETSCII_CURSOR_UP:
-			if (cursortk != tokens)
+			if (cursortk != starttk)
 				cursory--;
 			break;
 		case PETSCII_DEL:
@@ -230,30 +231,89 @@ int main(void)
 			break;
 		case PETSCII_F5:
 			{
-				putch(147);
-				parse_pretty(tokens);
-				prepare_statements(tokens);
+				system_show_runtime();
+				clrscr();
+				parse_pretty(starttk);
+				prepare_statements(starttk);
 				while (interpret_statement() && !runtime_error && *(volatile char *)0x91 != 0x7f)
 					;
-				restore_statements(tokens);
+				restore_statements(starttk);
 				if (!runtime_error)
 					getch();
-				putch(147); putch(14);
-				vic.color_border = VCOL_BLACK;
-				vic.color_back = VCOL_BLACK;
+				system_show_editor();
 				redraw = true;
 			} break;
 		case PETSCII_F6:
-			parse_pretty(tokens);
+			parse_pretty(starttk);
 			redraw = true;
 			break;
+		case PETSCII_F1:
+			{
+				krnio_setnam("@0:TEST.NIN,P,W");
+				if (krnio_open(2, 9, 2))
+				{				
+					krnio_chkout(2);
+					const char * tk = starttk;
+					while (*tk)
+					{
+						tk = format_statement(tk, buffer, cbuffer);
+						char i =0 ;
+						while (char c = buffer[i])
+						{
+							if (c >= p'A' && c <= p'Z')
+								c -= p'A' - 'A';
+							else if (c >= p'a' && c <= p'z')
+								c += 'a' - p'a';
+							krnio_chrout(c);
+							i++;
+						}
+						krnio_chrout(10);
+					}
+					krnio_clrchn();
+					krnio_close(2);
+				}
+			} break;
+		case PETSCII_F2:
+			{
+				krnio_setnam("@0:TEST.NIN,P,R");
+				if (krnio_open(2, 9, 2))
+				{				
+					edit_init();
+					krnio_chkin(2);
+
+					char * tk = starttk;
+					char status = krnio_status();
+					while (!status)
+					{
+						vic.color_back++;
+						char i = 0;
+						while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
+						{
+							vic.color_border++;
+							if (c >= 'A' && c <= 'Z')
+								c += p'A' - 'A';
+							else if (c >= 'a' && c <= 'z')
+								c -= 'a' - p'a';
+							buffer[i++] = c;
+						}
+						buffer[i] = 0;
+						tk = parse_statement(buffer, tk);
+					}
+					krnio_clrchn();
+					krnio_close(2);
+
+					*tk++ = STMT_END;
+					endtk = tk;
+					redraw = true;
+				}
+			} break;
 		}
 
 		if (cursory < 3 && screeny > 0)
 		{
 			screeny--;
 			cursory++;
-			screentk = tokens;
+			screentk = starttk;
 			for(unsigned i=0; i<screeny; i++)
 				screentk += token_skip_statement(screentk);
 			redraw = true;
@@ -262,7 +322,7 @@ int main(void)
 		{
 			screeny++;
 			cursory--;
-			screentk = tokens;
+			screentk = starttk;
 			for(unsigned i=0; i<screeny; i++)
 				screentk += token_skip_statement(screentk);
 			redraw = true;			
@@ -276,28 +336,5 @@ int main(void)
 			cursortk += token_skip_statement(cursortk);
 	}
 
-#if 0
-
-	prepare_statements(tokens);
-
-	char str[100];
-
-	const char * ctk = tokens;
-
-	while (*ctk)
-	{
-		ctk = format_statement(ctk, str);
-		printf(":%s:\n", str);
-	}
-
-	ctk = tokens;
-	while (*ctk)
-		ctk = dump_statement(ctk);
-
-	ctk = tokens;
-	while (*ctk)
-		ctk = interpret_statement(ctk);
-#endif
 	return 0;
-
 }

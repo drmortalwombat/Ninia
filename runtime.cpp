@@ -1,6 +1,6 @@
-#include "variables.h"
+#include "runtime.h"
 #include "interpreter.h"
-
+#include "errors.h"
 
 __striped Value			globals[256];
 char					num_globals, num_local_symbols;
@@ -26,8 +26,8 @@ unsigned mem_start, mem_end, mem_final;
 
 void mem_init(void)
 {
-	mem_start = mem_end = 0xc000;
-	mem_final = 0xd000;
+	mem_start = mem_end = 0xa000;
+	mem_final = 0xc000;
 }
 
 unsigned mh_size(MemHead * mh)
@@ -40,6 +40,8 @@ unsigned mh_size(MemHead * mh)
 		return sizeof(MemArray);
 	case MEM_VALUES:
 		return ((MemValues *)mh)->capacity * sizeof(Value) + sizeof(MemValues);
+	case MEM_DICT:
+		return ((MemDict *)mh)->size * sizeof(unsigned) + sizeof(MemDict);
 	default:
 		return sizeof(MemHead);
 	}
@@ -90,6 +92,10 @@ void mem_collect(void)
 				switch (mh->type & MEM_TYPE)
 				{
 				case MEM_STRING:
+					break;
+				case MEM_DICT:
+					((MemDict *)mh)->mh->type |= MEM_REFERENCED;
+					changed = true;
 					break;
 				case MEM_ARRAY:
 					((MemArray *)mh)->mh->type |= MEM_REFERENCED;
@@ -151,6 +157,13 @@ void mem_collect(void)
 			switch (mh->type & MEM_TYPE)
 			{
 			case MEM_STRING:
+				break;
+			case MEM_DICT:
+				{
+					MemDict	*	ma = (MemDict *)mh;
+					ma->mh = (MemHead *)(ma->mh->moved);
+				}
+				changed = true;
 				break;
 			case MEM_ARRAY:
 				{

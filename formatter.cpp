@@ -247,10 +247,6 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 					color[si + 1] = VCOL_MED_GREY;
 					si += 2;
 					break;
-				case TK_DOT:
-					format_insert(str, color, stack[--sp], si, '.');
-					si++;
-					break;
 				case TK_INVOKE:
 					if (n)
 						format_insert(str, color, stack[--sp], si, '(');
@@ -308,6 +304,17 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 					si += 2;
 					break;
 				case TK_STRUCT:
+					if (n)
+						format_insert(str, color, stack[sp-1], si, '{');
+					else
+					{
+						stack[sp++] = si;
+						str[si] = '{';
+						color[si] = VCOL_MED_GREY;
+					}
+					str[si + 1] = '}';
+					color[si + 1] = VCOL_MED_GREY;
+					si += 2;
 					break;
 				}
 			}
@@ -321,6 +328,14 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 			case TK_COMMA:
 				str[si] = ',';
 				color[si] = VCOL_MED_GREY;
+				si++;
+				break;
+			case TK_DOT:
+				format_insert(str, color, stack[--sp], si, '.');
+				si++;
+				break;
+			case TK_COLON:
+				format_insert(str, color, stack[--sp], si, ':');
 				si++;
 				break;
 			case TK_STRING:

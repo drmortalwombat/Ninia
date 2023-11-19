@@ -1,6 +1,6 @@
 #pragma once
 
-#include "variables.h"
+#include "runtime.h"
 
 #define VALUE_STACK_SIZE	64
 
