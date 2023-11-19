@@ -2,7 +2,14 @@
 #include "interpreter.h"
 #include "errors.h"
 
+#pragma bss( rtbss )
+
 __striped Value			globals[256];
+unsigned				global_symbols[256];
+unsigned				local_symbols[256];
+
+#pragma bss( bss )
+
 char					num_globals, num_local_symbols;
 
 unsigned global_find(unsigned symbol)

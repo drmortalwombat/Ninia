@@ -12,6 +12,7 @@
 #include "errors.h"
 #include <conio.h>
 #include <c64/kernalio.h>
+#include <c64/memmap.h>
 
 int main(void)
 {
@@ -172,15 +173,27 @@ int main(void)
 		{
 		case PETSCII_CURSOR_DOWN:
 			if (*cursortk)
+			{
 				cursory++;
+				redraw = marktk != nullptr;
+			}
 			break;
 		case PETSCII_CURSOR_UP:
 			if (cursortk != starttk)
+			{
 				cursory--;
+				redraw = marktk != nullptr;
+			}
 			break;
 		case PETSCII_DEL:
 			if (cursory > 0)
 			{
+				if (marktk)
+				{
+					marktk = nullptr;
+					redraw = true;
+				}
+
 				cursory--;
 				char * prevtk = screentk;
 				char i = 0;
@@ -219,9 +232,11 @@ int main(void)
 				cursorx = *cursortk - 1;
 			}
 			break;
-		case 25:
+		case S'Y':
 			if (*cursortk)
 			{
+				marktk = nullptr;
+
 				char len = token_skip_statement(cursortk);
 				char * nexttk = cursortk + len;
 				memmove(cursortk, nexttk, endtk - nexttk);
@@ -229,17 +244,76 @@ int main(void)
 				redraw = true;
 			} 
 			break;
+		case S'X':
+			if (marktk && cursortk > marktk)
+			{
+				unsigned	sz = cursortk - marktk;
+				blocktk = limittk - sz;
+
+				memcpy(blocktk, marktk, sz);
+				memmove(marktk, cursortk, endtk - cursortk);
+				endtk -= sz;
+				cursortk = marktk;
+				marktk = nullptr;
+
+				unsigned	line = edit_token_to_line(cursortk);
+				if (line < screeny || line > screeny + 24)
+				{
+					screeny = line;
+					cursory = 0;
+				}
+				else
+					cursory = line - screeny;
+				redraw = true;
+			} 
+			break;
+		case S'V':
+			if (blocktk)
+			{
+				marktk = cursortk;
+				unsigned	sz = limittk - blocktk;
+				cursortk += sz;
+				memmove(cursortk, marktk, endtk - marktk);
+				memcpy(marktk, blocktk, sz);
+				endtk += sz;
+
+				unsigned	line = edit_token_to_line(cursortk);
+				if (line < screeny || line > screeny + 24)
+				{
+					screeny = line;
+					cursory = 0;
+				}
+				else
+					cursory = line - screeny;
+				redraw = true;
+			}
+			break;
+		case S'C':
+			if (marktk && cursortk > marktk)
+			{
+				unsigned	sz = cursortk - marktk;
+				blocktk = limittk - sz;
+				memcpy(blocktk, marktk, sz);
+				marktk = nullptr;
+			}
+			break;
+		case S'B':
+			if (marktk)
+				marktk = nullptr;
+			else
+				marktk = cursortk;
+			redraw = true;
+			break;
 		case PETSCII_F5:
 			{
 				system_show_runtime();
-				clrscr();
 				parse_pretty(starttk);
 				prepare_statements(starttk);
 				while (interpret_statement() && !runtime_error && *(volatile char *)0x91 != 0x7f)
 					;
 				restore_statements(starttk);
 				if (!runtime_error)
-					getch();
+					system_getch();
 				system_show_editor();
 				redraw = true;
 			} break;
@@ -249,14 +323,19 @@ int main(void)
 			break;
 		case PETSCII_F1:
 			{
+				mmap_set(MMAP_NO_BASIC);
 				krnio_setnam("@0:TEST.NIN,P,W");
 				if (krnio_open(2, 9, 2))
 				{				
 					krnio_chkout(2);
+					mmap_set(MMAP_NO_ROM);
+
 					const char * tk = starttk;
 					while (*tk)
 					{
 						tk = format_statement(tk, buffer, cbuffer);
+
+						mmap_set(MMAP_NO_BASIC);
 						char i =0 ;
 						while (char c = buffer[i])
 						{
@@ -268,13 +347,18 @@ int main(void)
 							i++;
 						}
 						krnio_chrout(10);
+						mmap_set(MMAP_NO_ROM);
 					}
+					
+					mmap_set(MMAP_NO_BASIC);
 					krnio_clrchn();
 					krnio_close(2);
 				}
+				mmap_set(MMAP_NO_ROM);
 			} break;
 		case PETSCII_F2:
 			{
+				mmap_set(MMAP_NO_BASIC);
 				krnio_setnam("@0:TEST.NIN,P,R");
 				if (krnio_open(2, 9, 2))
 				{				
@@ -285,11 +369,9 @@ int main(void)
 					char status = krnio_status();
 					while (!status)
 					{
-						vic.color_back++;
 						char i = 0;
 						while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
 						{
-							vic.color_border++;
 							if (c >= 'A' && c <= 'Z')
 								c += p'A' - 'A';
 							else if (c >= 'a' && c <= 'z')
@@ -297,7 +379,9 @@ int main(void)
 							buffer[i++] = c;
 						}
 						buffer[i] = 0;
+						mmap_set(MMAP_NO_ROM);
 						tk = parse_statement(buffer, tk);
+						mmap_set(MMAP_NO_BASIC);
 					}
 					krnio_clrchn();
 					krnio_close(2);
@@ -306,8 +390,12 @@ int main(void)
 					endtk = tk;
 					redraw = true;
 				}
+				mmap_set(MMAP_NO_ROM);				
 			} break;
 		}
+
+		if (cursortk < marktk)
+			marktk = nullptr;
 
 		if (cursory < 3 && screeny > 0)
 		{
@@ -328,12 +416,12 @@ int main(void)
 			redraw = true;			
 		}
 
-		if (redraw)
-			edit_refresh_screen();
-
 		cursortk = screentk;
 		for(char i=0; i<cursory; i++)
 			cursortk += token_skip_statement(cursortk);
+
+		if (redraw)
+			edit_refresh_screen();
 	}
 
 	return 0;

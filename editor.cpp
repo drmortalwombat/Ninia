@@ -7,7 +7,12 @@
 #include "tokens.h"
 #include "errors.h"
 
+#pragma bss( editbss )
+
 char	buffer[200], cbuffer[200];
+char	ebuffer[200], ecbuffer[200];
+
+#pragma bss( bss )
 
 static char p2smap[] = {0x00, 0x00, 0x40, 0x20, 0x80, 0xc0, 0x80, 0x80};
 static char s2pmap[] = {0x40, 0x00, 0x20, 0xc0, 0xc0, 0x80, 0xa0, 0x40};
@@ -23,15 +28,13 @@ static inline char s2p(char ch)
 }
 
 char cursorx, cursory, screenx;
-char * screentk, * cursortk, * endtk;
+char * screentk, * cursortk, * endtk, * marktk, *blocktk;
 char * starttk, * limittk;
 unsigned screeny;
 
-char tokens[4096];
-
 void edit_init(void)
 {
-	starttk = tokens;
+	starttk = (char *)0xe000;
 	endtk = starttk;
 	screentk = cursortk = starttk;
 	cursorx = 0;
@@ -39,11 +42,42 @@ void edit_init(void)
 	screenx = 0;
 	screeny = 0;
 	*endtk++ = TK_END;
-	limittk = starttk + 4096;
+	limittk = (char *)0xfff0;
+}
+
+char * edit_screen_to_token(char y)
+{
+	char * tk = screentk;
+	for(char i=0; i<y; i++)
+		tk += token_skip_statement(tk);
+	return tk;
+}
+
+unsigned edit_token_to_line(const char * ct)
+{
+	char * tk = starttk;
+	unsigned line = 0;
+	while (*tk && tk <= ct)
+	{
+		tk += token_skip_statement(tk);
+		line++;
+	}
+
+	return line - 1;
+}
+
+char * edit_line_to_token(unsigned y)
+{
+	char * tk = starttk;
+	for(unsigned i=0; i<y; i++)
+		tk += token_skip_statement(tk);
+	return tk;
 }
 
 const char * edit_display_line(char y, const char * tk)
 {
+	char mark = (marktk && tk >= marktk && tk < cursortk) ? 0x80 : 0x00;
+
 	tk = format_statement(tk, buffer, cbuffer);
 
 	char i = 0;
@@ -52,16 +86,17 @@ const char * edit_display_line(char y, const char * tk)
 
 	char * dp = Screen + 40 * y;
 	char * cp = Color + 40 * y;
+
 	char j = 0;
 	while (j < 40 && buffer[i])
 	{
-		dp[j] = p2s(buffer[i]);
+		dp[j] = p2s(buffer[i]) | mark;
 		cp[j] = cbuffer[i];
 		j++; i++;
 	}
 	while (j < 40)
 	{
-		dp[j] = 0x20;
+		dp[j] = 0x20 | mark;
 		cp[j] = VCOL_WHITE;
 		j++;
 	}
@@ -75,8 +110,6 @@ void edit_refresh_screen(void)
 	for(char y = 0; y<24; y++)
 		ctk = edit_display_line(y, ctk);
 }
-
-char	ebuffer[200], ecbuffer[200];
 
 void scroll_left(void)
 {
@@ -151,9 +184,9 @@ char edit_line(void)
 
 		char ch;
 		if (upy != 24)
-			ch = getchx();
+			ch = system_getchx();
 		else
-			ch = getch();
+			ch = system_getch();
 
 		if (ch)
 		{
@@ -211,7 +244,12 @@ char edit_line(void)
 				}
 				break;
 
-			case 25:
+
+			case S'Y':
+			case S'X':
+			case S'V':
+			case S'C':
+			case S'B':
 			case PETSCII_CURSOR_UP:
 			case PETSCII_CURSOR_DOWN:
 			case '\n':

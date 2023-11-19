@@ -97,7 +97,7 @@ void system_show_editor(void)
 			dp1[j] = ~sp[j];
 		}
 	}
-	mmap_set(MMAP_NO_BASIC);
+	mmap_set(MMAP_NO_ROM);
 
 	vic_setmode(VICM_TEXT, Screen, Font);
 
@@ -111,4 +111,31 @@ void system_show_runtime(void)
 
 	vic.color_border = VCOL_LT_BLUE;
 	vic.color_back = VCOL_BLUE;
+
+	mmap_set(MMAP_NO_BASIC);
+	clrscr();
+	mmap_set(MMAP_NO_ROM);
+}
+
+void system_putch(char ch)
+{
+	mmap_set(MMAP_NO_BASIC);
+	putch(ch);
+	mmap_set(MMAP_NO_ROM);
+}
+
+char system_getch(void)
+{	
+	mmap_set(MMAP_NO_BASIC);
+	char ch = getch();
+	mmap_set(MMAP_NO_ROM);	
+	return ch;
+}
+
+char system_getchx(void)
+{	
+	mmap_set(MMAP_NO_BASIC);
+	char ch = getchx();
+	mmap_set(MMAP_NO_ROM);	
+	return ch;
 }

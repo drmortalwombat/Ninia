@@ -4,14 +4,10 @@
 #include "errors.h"
 #include <fixmath.h>
 
+#pragma bss( rtbss )
+
 __striped Value		estack[VALUE_STACK_SIZE];
 char				esp, efp;
-
-const char * loopstart[16];
-const char * exectk;
-char exect;
-char execl;
-
 
 struct CallStack
 {
@@ -24,6 +20,15 @@ struct CallStack
 char csp;
 
 unsigned		localvars[32];
+
+#pragma bss( bss )
+
+const char * loopstart[16];
+const char * exectk;
+char exect;
+char execl;
+
+
 char			num_locals;
 char	*		functk;
 
@@ -652,7 +657,7 @@ void interpret_builtin(char n)
 			valderef(0);
 			long li = valpop();
 			esp += n;
-			putch(li >> 16);
+			system_putch(li >> 16);
 			valpush(TYPE_NULL, 0);
 		} break;		
 	case RTSYM_RAND:
@@ -673,12 +678,12 @@ void interpret_builtin(char n)
 						long	s = valget(k);
 						if (s < 0)
 						{
-							putch('-');
+							system_putch('-');
 							s = -s;
 						}
 						unsigned	hi = (unsigned long)s >> 16;
 						if (hi == 0)
-							putch('0');
+							system_putch('0');
 						else
 						{
 							char i = 0;
@@ -691,7 +696,7 @@ void interpret_builtin(char n)
 							while (i > 0)
 							{
 								i--;
-								putch(str[i]);
+								system_putch(str[i]);
 							}
 						}
 						unsigned long l = s & 0xffff;
@@ -713,7 +718,7 @@ void interpret_builtin(char n)
 							char i = 0;
 							while (i < j)
 							{
-								putch(str[i]);
+								system_putch(str[i]);
 								i++;
 							}
 						}
@@ -724,7 +729,7 @@ void interpret_builtin(char n)
 						const char * str = valstring(k, tmp);
 						char n = str[0];
 						for(char i=0; i<n; i++)
-							putch(str[i + 1]);
+							system_putch(str[i + 1]);
 					} break;
 				}
 			}
@@ -1011,7 +1016,7 @@ bool interpret_expression(void)
 
 				static const char cmpmask[6] = {2, 5, 1, 3, 4, 6};
 
-				valpush(TYPE_NUMBER, (cmp & cmpmask[t & 0x0f]) ? 0x10000ul : 0ul);
+				valpush(TYPE_NUMBER, (cmp & cmpmask[t & 0x0f]) ? 0xffff0000ul : 0ul);
 			} break;
 		case TK_PREFIX:
 			switch (t)
@@ -1021,9 +1026,22 @@ bool interpret_expression(void)
 				valpush(TYPE_NUMBER, -valpop());
 				break;
 			case TK_NOT:
-				valderef(0); 
-				valpush(TYPE_NUMBER, (unsigned long)(~(unsigned)(valpop() >> 16)) << 16);
-				break;
+				{
+					valderef(0); 
+					char t = typeget(0);
+					if (t == TYPE_NUMBER)
+						valpush(TYPE_NUMBER, valpop() & 0xffff0000ul ^ 0xffff0000ul);
+					else if (t == TYPE_NULL)
+					{
+						esp++;
+						valpush(TYPE_NUMBER, -1l << 16);
+					}
+					else
+					{
+						esp++;
+						valpush(TYPE_NUMBER, 0);
+					}
+				}	break;
 			}
 			break;
 
