@@ -16,6 +16,10 @@ void edit_refresh_screen(void);
 
 void edit_show_status(void);
 
+void edit_scroll_up(void);
+
+void edit_scroll_down(void);
+
 char edit_line(void);
 
 char * edit_screen_to_token(char y);

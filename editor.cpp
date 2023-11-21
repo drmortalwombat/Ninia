@@ -147,6 +147,50 @@ void scroll_right(void)
 	}
 }
 
+void edit_scroll_up(void)
+{
+	screeny++;
+	screentk += token_skip_statement(screentk);
+
+	char * dp = Screen;
+	char * cp = Color;
+
+	for(char y=0; y<23; y++)
+	{
+		for(signed char x=39; x>=0; x--)
+		{
+			dp[x] = dp[x + 40];
+			cp[x] = cp[x + 40];
+		}
+		dp += 40;
+		cp += 40;
+	}
+
+	edit_display_line(23, edit_screen_to_token(23));
+}
+
+void edit_scroll_down(void)
+{
+	screeny--;
+	screentk = edit_line_to_token(screeny);
+
+	char * dp = Screen + 23 * 40;
+	char * cp = Color + 23 * 40;
+
+	for(char y=0; y<23; y++)
+	{
+		dp -= 40;
+		cp -= 40;
+		for(signed char x=39; x>=0; x--)
+		{
+			dp[x + 40] = dp[x];
+			cp[x + 40] = cp[x];
+		}
+	}
+
+	edit_display_line(0, screentk);	
+}
+
 char edit_length(void)
 {
 	char i = 200;

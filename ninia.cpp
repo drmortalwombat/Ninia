@@ -14,6 +14,89 @@
 #include <c64/kernalio.h>
 #include <c64/memmap.h>
 
+void tokens_load(const char * name)
+{
+	char	buffer[32];
+	strcpy(buffer, "0:");
+	strcat(buffer, name);
+	strcat(buffer, ",P,R");
+
+	mmap_set(MMAP_NO_BASIC);
+	krnio_setnam(buffer);
+	if (krnio_open(2, 9, 2))
+	{				
+		edit_init();
+		krnio_chkin(2);
+
+		char * tk = starttk;
+		char status = krnio_status();
+		while (!status)
+		{
+			char i = 0;
+			while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
+			{
+				if (c >= 'A' && c <= 'Z')
+					c += p'A' - 'A';
+				else if (c >= 'a' && c <= 'z')
+					c -= 'a' - p'a';
+				if (c != 13)
+					buffer[i++] = c;
+			}
+			buffer[i] = 0;
+			mmap_set(MMAP_NO_ROM);
+			tk = parse_statement(buffer, tk);
+			mmap_set(MMAP_NO_BASIC);
+		}
+		krnio_clrchn();
+		krnio_close(2);
+
+		*tk++ = STMT_END;
+		endtk = tk;
+	}
+	mmap_set(MMAP_NO_ROM);				
+}
+
+void tokens_save(const char * name)
+{
+	char	buffer[32];
+	strcpy(buffer, "@0:");
+	strcat(buffer, name);
+	strcat(buffer, ",P,W");
+
+	mmap_set(MMAP_NO_BASIC);
+	krnio_setnam(name);
+	if (krnio_open(2, 9, 2))
+	{				
+		krnio_chkout(2);
+		mmap_set(MMAP_NO_ROM);
+
+		const char * tk = starttk;
+		while (*tk)
+		{
+			tk = format_statement(tk, buffer, cbuffer);
+
+			mmap_set(MMAP_NO_BASIC);
+			char i =0 ;
+			while (char c = buffer[i])
+			{
+				if (c >= p'A' && c <= p'Z')
+					c -= p'A' - 'A';
+				else if (c >= p'a' && c <= p'z')
+					c += 'a' - p'a';
+				krnio_chrout(c);
+				i++;
+			}
+			krnio_chrout(10);
+			mmap_set(MMAP_NO_ROM);
+		}
+
+		mmap_set(MMAP_NO_BASIC);
+		krnio_clrchn();
+		krnio_close(2);
+	}
+	mmap_set(MMAP_NO_ROM);
+}
+
 int main(void)
 {
 	system_init();
@@ -157,6 +240,8 @@ int main(void)
 #endif
 	*tk++ = STMT_END;
 	endtk = tk;
+
+	tokens_load("PLOT.NIN");
 
 	system_show_editor();
 	edit_refresh_screen();
@@ -323,74 +408,12 @@ int main(void)
 			break;
 		case PETSCII_F1:
 			{
-				mmap_set(MMAP_NO_BASIC);
-				krnio_setnam("@0:TEST.NIN,P,W");
-				if (krnio_open(2, 9, 2))
-				{				
-					krnio_chkout(2);
-					mmap_set(MMAP_NO_ROM);
-
-					const char * tk = starttk;
-					while (*tk)
-					{
-						tk = format_statement(tk, buffer, cbuffer);
-
-						mmap_set(MMAP_NO_BASIC);
-						char i =0 ;
-						while (char c = buffer[i])
-						{
-							if (c >= p'A' && c <= p'Z')
-								c -= p'A' - 'A';
-							else if (c >= p'a' && c <= p'z')
-								c += 'a' - p'a';
-							krnio_chrout(c);
-							i++;
-						}
-						krnio_chrout(10);
-						mmap_set(MMAP_NO_ROM);
-					}
-					
-					mmap_set(MMAP_NO_BASIC);
-					krnio_clrchn();
-					krnio_close(2);
-				}
-				mmap_set(MMAP_NO_ROM);
+				tokens_save("TEST.NIN");
 			} break;
 		case PETSCII_F2:
 			{
-				mmap_set(MMAP_NO_BASIC);
-				krnio_setnam("@0:TEST.NIN,P,R");
-				if (krnio_open(2, 9, 2))
-				{				
-					edit_init();
-					krnio_chkin(2);
-
-					char * tk = starttk;
-					char status = krnio_status();
-					while (!status)
-					{
-						char i = 0;
-						while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
-						{
-							if (c >= 'A' && c <= 'Z')
-								c += p'A' - 'A';
-							else if (c >= 'a' && c <= 'z')
-								c -= 'a' - p'a';
-							buffer[i++] = c;
-						}
-						buffer[i] = 0;
-						mmap_set(MMAP_NO_ROM);
-						tk = parse_statement(buffer, tk);
-						mmap_set(MMAP_NO_BASIC);
-					}
-					krnio_clrchn();
-					krnio_close(2);
-
-					*tk++ = STMT_END;
-					endtk = tk;
-					redraw = true;
-				}
-				mmap_set(MMAP_NO_ROM);				
+				tokens_load("TEST.NIN");
+				redraw = true;
 			} break;
 		}
 
@@ -399,21 +422,14 @@ int main(void)
 
 		if (cursory < 3 && screeny > 0)
 		{
-			screeny--;
+			edit_scroll_down();
 			cursory++;
-			screentk = starttk;
-			for(unsigned i=0; i<screeny; i++)
-				screentk += token_skip_statement(screentk);
-			redraw = true;
 		}
 		else if (cursory > 20)
 		{
-			screeny++;
+
+			edit_scroll_up();
 			cursory--;
-			screentk = starttk;
-			for(unsigned i=0; i<screeny; i++)
-				screentk += token_skip_statement(screentk);
-			redraw = true;			
 		}
 
 		cursortk = screentk;
