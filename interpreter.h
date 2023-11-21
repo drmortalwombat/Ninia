@@ -3,6 +3,7 @@
 #include "runtime.h"
 
 #define VALUE_STACK_SIZE	64
+#define CALL_STACK_SIZE		32
 
 void prepare_statements(char * tk);
 

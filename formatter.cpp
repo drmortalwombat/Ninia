@@ -34,6 +34,10 @@ const char relational_names[][2] = {
 	"==", "!=", "<", "<=", ">", ">="
 };
 
+const char assign_names[][2] = {
+	"=", "+=", "-="
+};
+
 const char * format_expression(const char * tk, char * str, char * color, char si)
 {
 	char		ti = 0;
@@ -120,7 +124,6 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 			}	break;
 
 		case TK_BINARY:
-#if 1
 			if (binary_names[t & 0x0f][1])
 			{
 				format_insert2(str, color, stack[--sp], si, binary_names[t & 0x0f][0], binary_names[t & 0x0f][1]);
@@ -131,50 +134,8 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 				format_insert(str, color, stack[--sp], si, binary_names[t & 0x0f][0]);
 				si++;				
 			}
-#else
-			switch (t)
-			{
-			case TK_ADD:
-				format_insert(str, color, stack[--sp], si, '+');
-				si++;
-				break;
-			case TK_SUB:
-				format_insert(str, color, stack[--sp], si, '-');
-				si++;
-				break;
-			case TK_MUL:
-				format_insert(str, color, stack[--sp], si, '*');
-				si++;
-				break;
-			case TK_DIV:
-				format_insert(str, color, stack[--sp], si, '/');
-				si++;
-				break;
-			case TK_MOD:
-				format_insert(str, color, stack[--sp], si, '%');
-				si++;
-				break;
-			case TK_SHL:
-				format_insert2(str, color, stack[--sp], si, '<', '<');
-				si += 2;
-				break;
-			case TK_SHR:
-				format_insert2(str, color, stack[--sp], si, '>', '>');
-				si += 2;
-				break;
-			case TK_AND:
-				format_insert(str, color, stack[--sp], si, '&');
-				si++;
-				break;
-			case TK_OR:
-				format_insert(str, color, stack[--sp], si, '|');
-				si++;
-				break;
-			}
-#endif
 			break;
 		case TK_RELATIONAL:
-#if 1
 			if (relational_names[t & 0x0f][1])
 			{
 				format_insert2(str, color, stack[--sp], si, relational_names[t & 0x0f][0], relational_names[t & 0x0f][1]);
@@ -185,35 +146,6 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 				format_insert(str, color, stack[--sp], si, relational_names[t & 0x0f][0]);
 				si++;				
 			}
-#else
-			switch (t)
-			{
-			case TK_EQUAL:
-				format_insert2(str, color, stack[--sp], si, '=', '=');
-				si += 2;
-				break;
-			case TK_NOT_EQUAL:
-				format_insert2(str, color, stack[--sp], si, '!', '=');
-				si += 2;
-				break;
-			case TK_LESS_THAN:
-				format_insert(str, color, stack[--sp], si, '<');
-				si++;
-				break;
-			case TK_LESS_EQUAL:
-				format_insert2(str, color, stack[--sp], si, '<', '=');
-				si += 2;
-				break;
-			case TK_GREATER_THAN:
-				format_insert(str, color, stack[--sp], si, '>');
-				si++;
-				break;
-			case TK_GREATER_EQUAL:
-				format_insert2(str, color, stack[--sp], si, '>', '=');
-				si += 2;
-				break;
-			}
-#endif
 			break;
 		case TK_PREFIX:
 			switch (t)
@@ -264,9 +196,18 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 			break;
 
 		case TK_ASSIGN:
-			format_insert(str, color, stack[--sp], si, '=');
-			si++;
+			if (assign_names[t & 0x0f][1])
+			{
+				format_insert2(str, color, stack[--sp], si, assign_names[t & 0x0f][0], assign_names[t & 0x0f][1]);
+				si += 2;				
+			}
+			else
+			{
+				format_insert(str, color, stack[--sp], si, assign_names[t & 0x0f][0]);
+				si++;				
+			}
 			break;
+
 		case TK_STRUCTURE:
 			{
 				char n = tk[ti++];

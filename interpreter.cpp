@@ -11,25 +11,26 @@ __zeropage char		esp;
 __striped Value		estack[VALUE_STACK_SIZE];
 char efp;
 
-struct CallStack
-{
-	const char *	loopstart[16];
-	char			efp, esp;
-	const char	*	tk;
-	char			t, l;
-}	callstack[16];
+#define CSTACK_NONE		0
+#define CSTACK_WHILE	1
+#define CSTACK_FOR		2
+#define CSTACK_CALL		3
 
-char csp;
+__striped struct CallStack
+{
+	char			efp, esp, cfp;
+	char			token, type;
+	const char	*	tk;
+}	callstack[CALL_STACK_SIZE];
+
+char csp, cfp;
 
 unsigned		localvars[32];
 
 #pragma bss( bss )
 
-const char * loopstart[16];
 const char * exectk;
 char exect;
-char execl;
-
 
 char			num_locals;
 char	*		functk;
@@ -165,14 +166,15 @@ char * prepare_function(char * tk)
 void prepare_statements(char * tk)
 {
 	exectk = tk;
-	execl = 0;
 	esp = VALUE_STACK_SIZE;
 	csp = 0;
+	cfp = 0;
 	num_globals = 0;
 	num_locals = 0;
 	num_local_symbols = 0;
 	functk = nullptr;
 	runtime_error = 0;
+	callstack[0].type = CSTACK_NONE;
 	mem_init();
 
 	char 		pl = 1;
@@ -633,8 +635,9 @@ MemArray * array_expand(char at, unsigned by)
 			return nullptr;
 		ma = (MemArray *)valmem(at);
 		mv = (MemValues *)ma->mh;
-		for(unsigned i=0; i<size; i++)
-			mnv->values[i] = mv->values[i];
+		memcpy(mnv->values, mv->values, size * sizeof(Value));
+//		for(unsigned i=0; i<size; i++)
+//			mnv->values[i] = mv->values[i];
 		ma->mh = mnv;
 	}
 
@@ -654,7 +657,14 @@ void interpret_builtin(char n)
 {
 	char tmp[2];
 	unsigned lf = valget(n);
-	switch (lf)
+
+	if ((lf & 0xff00) != 0x0100)
+	{
+		runtime_error = RERR_UNDEFINED_SYMBOL;
+		return;
+	}
+
+	switch ((char)lf)
 	{
 	case RTSYM_ABS:
 		{
@@ -1087,16 +1097,13 @@ bool interpret_expression(void)
 						{
 							callstack[csp].efp = efp;
 							callstack[csp].esp = esp + n;
+							callstack[csp].cfp = cfp;
 							callstack[csp].tk = tk + ti;
-							callstack[csp].t = exect;
-							callstack[csp].l = execl;
-							for(char i=0; i<execl; i++)
-								callstack[csp].loopstart[i] = loopstart[i];
-							csp++;
+							callstack[csp].token = exect;
+							callstack[csp].type = CSTACK_CALL;
+							cfp = csp;
 
 							exectk = (char *)valget(n);
-							execl = 0;
-							loopstart[0] = nullptr;
 							char k = exectk[1];
 							
 							for(char i=0; i<n; i++)
@@ -1119,6 +1126,25 @@ bool interpret_expression(void)
 		case TK_ASSIGN:
 			{
 				valderef(0);
+				switch (t)
+				{
+				case TK_ASSIGN:
+					break;
+				case TK_ASSIGN_ADD:
+					esp--;
+					estack[esp] = estack[esp + 2];
+					valderef(0);
+					estack[esp + 1].value += estack[esp].value;
+					esp++;
+					break;
+				case TK_ASSIGN_SUB:
+					esp--;
+					estack[esp] = estack[esp + 2];
+					valderef(0);
+					estack[esp + 1].value = estack[esp].value - estack[esp + 1].value;
+					esp++;
+					break;
+				}
 				valassign();
 			}	break;
 
@@ -1212,32 +1238,35 @@ bool interpret_statement(void)
 	char 	l = tk[0];
 	if (l > 0) l--;
 
-	if (l > execl)
-		execl = l;
+	l += cfp;
+
+	if (l > csp)
+	{
+		csp = l;
+		callstack[csp].type = CSTACK_NONE;
+	}
 	else
 	{
-		while (l < execl)
+		while (l < csp)
 		{
-			execl--;
-			if (loopstart[execl])
+			csp--;
+			if (callstack[csp].type)
 			{
-				tk = loopstart[execl];
+				tk = callstack[csp].tk;
 				break;
 			}
 		}
 	}
 
-	loopstart[execl] = nullptr;
-
 	if (!tk[0])
 		return false;
 
 	const char * etk = tk;
-
 	char 	t = tk[1];
 
-	if (execl == 0 && csp > 0)
+	if (callstack[csp].type == CSTACK_CALL)
 		t = STMT_RETURN_NULL;
+	callstack[csp].type = CSTACK_NONE;
 
 	switch (t)
 	{
@@ -1278,22 +1307,24 @@ bool interpret_statement(void)
 		case STMT_RETURN:
 			{
 				valderef(0);
-				csp--;
+				csp = cfp;
+
 				char rsp = callstack[csp].esp;
 				estack[rsp] = estack[esp];
 				esp = rsp;
-
 				efp = callstack[csp].efp;
+				cfp = callstack[csp].cfp;
+
 				tk = callstack[csp].tk;
-				t =  callstack[csp].t;
-				execl = callstack[csp].l;
-				for(char i=0; i<execl; i++)
-					loopstart[i] = callstack[csp].loopstart[i];
+				t =  callstack[csp].token;
 			} break;
 
 		case STMT_WHILE:
 			if (boolpop())
-				loopstart[execl] = etk;
+			{
+				callstack[csp].tk = etk;
+				callstack[csp].type = CSTACK_WHILE;
+			}
 			else
 				exectk = (char *)(etk[2] + (etk[3] << 8));
 			return true;

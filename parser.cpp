@@ -186,17 +186,31 @@ char * parse_expression(const char * str, char * tk)
 			if (prefix)
 				return nullptr;
 
-			tk = parse_op(tk, TK_ADD);
 			c = *str++;
+			if (c == '=')
+			{
+				tk = parse_op(tk, TK_ASSIGN_ADD);
+				c = *str++;
+			}
+			else
+				tk = parse_op(tk, TK_ADD);
 			prefix = true;
 			break;
 		case '-':
-			if (prefix)
-				tk = parse_op(tk, TK_NEGATE);
-			else
-				tk = parse_op(tk, TK_SUB);
-
 			c = *str++;
+			if (c == '=')
+			{
+				tk = parse_op(tk, TK_ASSIGN_SUB);
+				c = *str++;
+			}
+			else
+			{
+				if (prefix)
+					tk = parse_op(tk, TK_NEGATE);
+				else
+					tk = parse_op(tk, TK_SUB);
+			}
+
 			prefix = true;
 			break;
 		case '*':

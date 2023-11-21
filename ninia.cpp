@@ -104,6 +104,7 @@ int main(void)
 	symbols_init();
 
 	edit_init();
+#if 0
 	char * tk = starttk;
 
 #if 0
@@ -238,10 +239,12 @@ int main(void)
 	tk = parse_statement(p" i=i+1", tk);
 	tk = parse_statement(p"", tk);
 #endif
+
 	*tk++ = STMT_END;
 	endtk = tk;
+#endif
 
-	tokens_load("PLOT.NIN");
+	tokens_load("SIEVE.NIN");
 
 	system_show_editor();
 	edit_refresh_screen();
