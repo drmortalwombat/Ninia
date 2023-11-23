@@ -244,7 +244,7 @@ int main(void)
 	endtk = tk;
 #endif
 
-	tokens_load("SIEVE.NIN");
+	tokens_load("PLOT.NIN");
 
 	system_show_editor();
 	edit_refresh_screen();

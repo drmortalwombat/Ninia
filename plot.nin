@@ -1,0 +1,9 @@
+def plot(x,y,a,c)
+ poke(1024+40*y+x,a)
+ poke(55296+40*y+x,c)
+ 
+var i=0
+while i<40
+ plot(i,0,81,1)
+ plot(i,24,81,1)
+ i+=1

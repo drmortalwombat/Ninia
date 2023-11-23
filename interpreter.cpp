@@ -539,6 +539,39 @@ void valassign(void)
 	esp++;
 }
 
+void valinc(long by)
+{
+	switch (estack[esp].type)
+	{
+	case TYPE_GLOBAL_REF:
+		globals[(char)(estack[esp].value)].value += by;
+		break;
+	case TYPE_LOCAL_REF:
+		estack[(char)(efp - estack[esp].value)].value += by;
+		break;
+	case TYPE_ARRAY_REF:
+		{
+			MemArray	*	ma = (MemArray *)(unsigned)estack[esp].value;
+			MemValues	*	mv = (MemValues *)ma->mh;
+			unsigned		mi = estack[esp].value >> 16;
+			mv->values[mi].value += by;
+		} break;
+	case TYPE_STRUCT_REF:
+		{
+			MemDict		*	md = (MemDict *)(unsigned)estack[esp].value;
+			MemValues	*	mv = (MemValues *)md->mh;
+			unsigned		ms = estack[esp].value >> 16;
+			char			mi = struct_index(md, ms);
+			if (mi != 0xff)
+				mv->values[mi].value += by;
+			else
+				runtime_error = RERR_UNDEFINED_SYMBOL;
+		} break;
+	default:
+		runtime_error = RERR_INVALID_ASSIGN;
+	}
+}
+
 void valswap(void)
 {
 	Value	es = estack[esp];
@@ -1129,23 +1162,15 @@ bool interpret_expression(void)
 				switch (t)
 				{
 				case TK_ASSIGN:
+					valassign();
 					break;
 				case TK_ASSIGN_ADD:
-					esp--;
-					estack[esp] = estack[esp + 2];
-					valderef(0);
-					estack[esp + 1].value += estack[esp].value;
-					esp++;
+					valinc(valpop());
 					break;
 				case TK_ASSIGN_SUB:
-					esp--;
-					estack[esp] = estack[esp + 2];
-					valderef(0);
-					estack[esp + 1].value = estack[esp].value - estack[esp + 1].value;
-					esp++;
+					valinc(-valpop());
 					break;
 				}
-				valassign();
 			}	break;
 
 		case TK_STRUCTURE:

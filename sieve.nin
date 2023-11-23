@@ -1,0 +1,21 @@
+VAR sieve=array(1000)
+VAR i=3
+
+WHILE i*i<len(sieve)
+ IF !sieve[i]
+  VAR j=i*i
+  WHILE j<len(sieve)
+   sieve[j]=-1
+   j=j+2*i
+ i=i+2
+
+i=3
+WHILE i<len(sieve)
+ IF !sieve[i]
+  print(i," ")
+ i=i+2
+
+print("\n")
+
+
+
