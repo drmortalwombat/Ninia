@@ -21,6 +21,12 @@ void symbols_init(void);
 #define RTSYM_ARRAY		0x0a
 #define RTSYM_PUSH		0x0b
 #define RTSYM_POP		0x0c
+#define RTSYM_ASC		0x0d
+#define RTSYM_VAL		0x0e
+#define RTSYM_STR		0x0f
+#define RTSYM_FLOOR		0x10
+#define RTSYM_CEIL		0x11
+#define RTSYM_FIND		0x12
 
 unsigned symbol_add(const char * s);
 

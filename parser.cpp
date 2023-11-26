@@ -1,23 +1,9 @@
 #include "parser.h"
 #include "errors.h"
 
-bool is_letter(char c)
-{
-	return c >= p'a' && c <= p'z' || c >= p'A' && c <= p'Z';
-}
-
-bool is_exletter(char c)
-{
-	return c >= p'a' && c <= p'z' || c >= p'A' && c <= p'Z' || c >= '0' && c <= '9' || c == '_';
-}
-
-bool is_digit(char c)
-{
-	return c >= '0' && c <= '9';
-}
-
-char	ostack[32];
-char	osp;
+char		ostack[32];
+char		osp;
+unsigned	symlist[32];
 
 char oppri(char op)
 {
@@ -51,8 +37,6 @@ char oppri(char op)
 	case TK_POSTFIX:
 		return 0x80;
 
-	case TK_STRUCTURE:
-		return 0x80;
 	case TK_CONTROL:
 		switch (op)
 		{
@@ -64,6 +48,10 @@ char oppri(char op)
 			return 4;
 		case TK_COMMA:
 			return 0x7f;
+		case TK_LIST:
+		case TK_ARRAY:
+		case TK_STRUCT:
+			return 0x80;
 		default:
 			return 0xff;
 		}
@@ -73,34 +61,35 @@ char oppri(char op)
 	}
 }
 
-char * parse_op(char * tk, char op)
+char parse_op(char * tk, char ni, char op)
 {
 	char pri = oppri(op);
 	while (osp && oppri(ostack[osp-1]) <= pri)
 	{
-		*tk++ = ostack[osp-1];
+		tk[ni++] = ostack[osp-1];
 		osp--;
 	}
 	
 	ostack[osp++] = op;
-	return tk;
+	return ni;
 }
 
-char * parse_comma(char * tk)
+char parse_comma(char * tk, char ni)
 {
 	while (osp && oppri(ostack[osp-1]) < 0x40)
 	{
-		*tk++ = ostack[osp-1];
+		tk[ni++] = ostack[osp-1];
 		osp--;
 	}
 	if (osp)
 		ostack[osp++] = TK_COMMA;
 	else
-		*tk++ = TK_COMMA;
-	return tk;
+		tk[ni++] = TK_COMMA;
+
+	return ni;
 }
 
-char * close_op(char * tk, bool prefix)
+char close_op(char * tk, char ni, bool prefix)
 {
 	int cnt = 0;
 	if (!prefix)
@@ -111,15 +100,23 @@ char * close_op(char * tk, bool prefix)
 		if (ostack[osp-1] == TK_COMMA)
 			cnt++;
 		else
-			*tk++ = ostack[osp-1];
+			tk[ni++] = ostack[osp-1];
 		osp--;
 	}
 
-	*tk++ = ostack[osp-1];
-	*tk++ = cnt;
 	osp--;
+	tk[ni++] = ostack[osp];
+	tk[ni++] = cnt;
+	if (ostack[osp] == TK_STRUCT)
+	{
+		for(char i=0; i<cnt; i++)
+		{
+			tk[ni++] = symlist[osp + i] & 0xff;
+			tk[ni++] = symlist[osp + i] >> 8;
+		}
+	}
 
-	return tk;
+	return ni;
 }
 
 char * parse_expression(const char * str, char * tk)
@@ -127,17 +124,18 @@ char * parse_expression(const char * str, char * tk)
 	osp = 0;
 
 	char 	c = *str++;
+	char	ni = 0;
 	bool	prefix = true;
 	for(;;)
 	{
 		switch (c)
 		{
 		case '\0':
-			tk = parse_op(tk, TK_END);
+			ni = parse_op(tk, ni, TK_END);
 			if (osp != 1)
 				return nullptr;
-			*tk++ = TK_END;
-			return tk;
+			tk[ni++] = TK_END;
+			return tk + ni;
 
 		case ' ':
 			c = *str++;
@@ -168,17 +166,18 @@ char * parse_expression(const char * str, char * tk)
 		case ']':
 		case '}':
 		case 221:
-			tk = close_op(tk, prefix);
+			ni = close_op(tk, ni, prefix);
 			c = *str++;
 			prefix = false;
 			break;
 		case ',':
-			tk = parse_comma(tk);
+			ni = parse_comma(tk, ni);
 			c = *str++;
 			prefix = true;
 			break;
 		case ':':
-			tk = parse_op(tk, TK_COLON);
+			ni -= 2;
+			symlist[osp-1] = ((tk[ni] & 0x0f) << 16) | tk[ni + 1];
 			c = *str++;
 			prefix = true;
 			break;
@@ -189,47 +188,47 @@ char * parse_expression(const char * str, char * tk)
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(tk, TK_ASSIGN_ADD);
+				ni = parse_op(tk, ni, TK_ASSIGN_ADD);
 				c = *str++;
 			}
 			else
-				tk = parse_op(tk, TK_ADD);
+				ni = parse_op(tk, ni, TK_ADD);
 			prefix = true;
 			break;
 		case '-':
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(tk, TK_ASSIGN_SUB);
+				ni = parse_op(tk, ni, TK_ASSIGN_SUB);
 				c = *str++;
 			}
 			else
 			{
 				if (prefix)
-					tk = parse_op(tk, TK_NEGATE);
+					ni = parse_op(tk, ni, TK_NEGATE);
 				else
-					tk = parse_op(tk, TK_SUB);
+					ni = parse_op(tk, ni, TK_SUB);
 			}
 
 			prefix = true;
 			break;
 		case '*':
-			tk = parse_op(tk, TK_MUL);
+			ni = parse_op(tk, ni, TK_MUL);
 			c = *str++;
 			prefix = true;
 			break;
 		case '/':
-			tk = parse_op(tk, TK_DIV);
+			ni = parse_op(tk, ni, TK_DIV);
 			c = *str++;
 			prefix = true;
 			break;
 		case '%':
-			tk = parse_op(tk, TK_MOD);
+			ni = parse_op(tk, ni, TK_MOD);
 			c = *str++;
 			prefix = true;
 			break;
 		case '.':
-			tk = parse_op(tk, TK_DOT);
+			ni = parse_op(tk, ni, TK_DOT);
 			c = *str++;
 			prefix = true;
 			break;
@@ -237,54 +236,54 @@ char * parse_expression(const char * str, char * tk)
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(tk, TK_NOT_EQUAL);
+				ni = parse_op(tk, ni, TK_NOT_EQUAL);
 				c = *str++;
 			}
 			else
-				tk = parse_op(tk, TK_NOT);
+				ni = parse_op(tk, ni, TK_NOT);
 			prefix = true;
 			break;
 		case '=':
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(tk, TK_EQUAL);
+				ni = parse_op(tk, ni, TK_EQUAL);
 				c = *str++;
 			}
 			else
-				tk = parse_op(tk, TK_ASSIGN);
+				ni = parse_op(tk, ni, TK_ASSIGN);
 			prefix = true;
 			break;
 		case '<':
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(tk, TK_LESS_EQUAL);
+				ni = parse_op(tk, ni, TK_LESS_EQUAL);
 				c = *str++;
 			}
 			else if (c == '<')
 			{
-				tk = parse_op(tk, TK_SHL);
+				ni = parse_op(tk, ni, TK_SHL);
 				c = *str++;
 			}
 			else
-				tk = parse_op(tk, TK_LESS_THAN);
+				ni = parse_op(tk, ni, TK_LESS_THAN);
 			prefix = true;
 			break;
 		case '>':
 			c = *str++;
 			if (c == '=')
 			{
-				tk = parse_op(tk, TK_GREATER_EQUAL);
+				ni = parse_op(tk, ni, TK_GREATER_EQUAL);
 				c = *str++;
 			}
 			else if (c == '>')
 			{
-				tk = parse_op(tk, TK_SHR);
+				ni = parse_op(tk, ni, TK_SHR);
 				c = *str++;
 			}
 			else
-				tk = parse_op(tk, TK_GREATER_THAN);
+				ni = parse_op(tk, ni, TK_GREATER_THAN);
 			prefix = true;
 			break;
 		case '"':
@@ -308,15 +307,15 @@ char * parse_expression(const char * str, char * tk)
 							c = 8;
 					}
 
-					tk[i + 2] = c;
+					tk[ni + i + 2] = c;
 					i++;
 					c = *str++;
 				}
 				c = *str++;
 
-				tk[0] = TK_STRING;
-				tk[1] = i;
-				tk += i + 2;
+				tk[ni + 0] = TK_STRING;
+				tk[ni + 1] = i;
+				ni += i + 2;
 				prefix = false;
 			} break;				
 		default:
@@ -335,8 +334,8 @@ char * parse_expression(const char * str, char * tk)
 				idbuf[j] = 0;
 
 				unsigned	id = symbol_add(idbuf);
-				*tk++ = (id >> 8) | TK_IDENT;
-				*tk++ = id & 0xff;
+				tk[ni++] = (id >> 8) | TK_IDENT;
+				tk[ni++] = id & 0xff;
 				prefix = false;
 			}
 			else if (is_digit(c))
@@ -351,9 +350,9 @@ char * parse_expression(const char * str, char * tk)
 				} while (is_digit(c));
 				if (c == '.')
 				{
-					*tk++ = TK_NUMBER;
-					*tk++ = num >> 8;
-					*tk++ = num & 0xff;
+					tk[ni++] = TK_NUMBER;
+					tk[ni++] = num >> 8;
+					tk[ni++] = num & 0xff;
 					num = 0;
 					unsigned long rem = 1;
 					c = *str++;
@@ -364,25 +363,25 @@ char * parse_expression(const char * str, char * tk)
 						c = *str++;
 					} 
 					num = ((num << 16) + (rem - 1)) / rem;
-					*tk++ = num >> 8;
-					*tk++ = num & 0xff;
+					tk[ni++] = num >> 8;
+					tk[ni++] = num & 0xff;
 				}
 				else if (num < 16)
 				{
-					*tk++ = TK_TINY_INT | num;
+					tk[ni++] = TK_TINY_INT | num;
 				}
 				else if (num < 4096)
 				{
-					*tk++ = TK_SMALL_INT | (num >> 8);
-					*tk++ = num & 0xff;
+					tk[ni++] = TK_SMALL_INT | (num >> 8);
+					tk[ni++] = num & 0xff;
 				}
 				else
 				{
-					*tk++ = TK_NUMBER;
-					*tk++ = num >> 8;
-					*tk++ = num & 0xff;
-					*tk++ = 0;
-					*tk++ = 0;
+					tk[ni++] = TK_NUMBER;
+					tk[ni++] = num >> 8;
+					tk[ni++] = num & 0xff;
+					tk[ni++] = 0;
+					tk[ni++] = 0;
 				}
 				prefix = false;
 			}

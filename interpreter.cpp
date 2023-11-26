@@ -25,7 +25,7 @@ __striped struct CallStack
 
 char csp, cfp;
 
-unsigned		localvars[32];
+__striped unsigned		localvars[32];
 
 #pragma bss( bss )
 
@@ -107,7 +107,6 @@ char * prepare_expression(char * tk, bool var)
 			}	break;
 
 		case TK_POSTFIX:
-		case TK_STRUCTURE:
 			tk += 2;
 			left = false;
 			break;
@@ -127,6 +126,15 @@ char * prepare_expression(char * tk, bool var)
 				case TK_COLON:
 				case TK_DOT:
 					tk++;
+					left = false;
+					break;
+				case TK_LIST:
+				case TK_ARRAY:
+					tk += 2;
+					left = false;
+					break;
+				case TK_STRUCT:
+					tk += 2 * tk[1] + 2;
 					left = false;
 					break;
 				default:
@@ -305,7 +313,6 @@ char * restore_expression(char * tk, bool var)
 			}	break;			
 
 		case TK_POSTFIX:
-		case TK_STRUCTURE:
 			tk += 2;
 			left = false;
 			break;
@@ -325,6 +332,15 @@ char * restore_expression(char * tk, bool var)
 				case TK_COLON:
 				case TK_DOT:
 					tk++;
+					left = false;
+					break;
+				case TK_LIST:
+				case TK_ARRAY:
+					tk += 2;
+					left = false;
+					break;
+				case TK_STRUCT:
+					tk += 2 * tk[1] + 2;
 					left = false;
 					break;
 				default:
@@ -418,12 +434,14 @@ void restore_statements(char * tk)
 
 char struct_index(MemDict * md, unsigned sym)
 {
-	char sz = md->size;
+	char sz = md->symbols[0];
+	unsigned * sp = (unsigned *)(md->symbols + 1);
+
 	__assume(sz < 64);
 	while (sz > 0)
 	{
 		sz--;
-		if (md->symbols[sz] == sym)
+		if (sp[sz] == sym)
 			return sz;
 	}
 	return 0xff;
@@ -617,15 +635,16 @@ MemValues * values_allocate(unsigned size, unsigned capacity)
 	return v;
 }
 
-MemDict * dict_allocate(char size)
+MemDict * dict_allocate(const char * dict)
 {
-	MemDict	*	d = (MemDict *)mem_allocate(MEM_DICT, sizeof(MemDict) + sizeof(MemValues) + size * (sizeof(MemValues) + sizeof(unsigned)));
+	char size = dict[0];
+	MemDict	*	d = (MemDict *)mem_allocate(MEM_DICT, sizeof(MemDict) + sizeof(MemValues) + size * sizeof(MemValues));
 	if (d)
 	{
-		MemValues	*	v = (MemValues *)(d->symbols + size);
+		MemValues	*	v = (MemValues *)(d + 1);
 
 		d->mh = v;
-		d->size = size;
+		d->symbols = dict;
 
 		v->type = MEM_VALUES;
 		v->capacity = size;
@@ -669,8 +688,6 @@ MemArray * array_expand(char at, unsigned by)
 		ma = (MemArray *)valmem(at);
 		mv = (MemValues *)ma->mh;
 		memcpy(mnv->values, mv->values, size * sizeof(Value));
-//		for(unsigned i=0; i<size; i++)
-//			mnv->values[i] = mv->values[i];
 		ma->mh = mnv;
 	}
 
@@ -685,10 +702,30 @@ MemString * string_allocate(char size)
 	return s;
 }
 
+MemString * string_allocate(const char * str)
+{
+	char i = 0;
+	while (str[i])
+		i++;
+
+	MemString	*	s = (MemString *)mem_allocate(MEM_STRING, sizeof(MemString) + i);
+	if (s)
+	{
+		s->data[0] = i;
+		i = 0;
+		while (char c = str[i])
+		{
+			i++;
+			s->data[i] = c;
+		}
+	}
+	return s;
+}
+
 
 void interpret_builtin(char n)
 {
-	char tmp[2];
+	char tmp[2], tmp2[2];
 	unsigned lf = valget(n);
 
 	if ((lf & 0xff00) != 0x0100)
@@ -728,54 +765,11 @@ void interpret_builtin(char n)
 				{
 				case TYPE_NUMBER:
 					{
-						char 	str[20];
-						long	s = valget(k);
-						if (s < 0)
-						{
-							system_putch('-');
-							s = -s;
-						}
-						unsigned	hi = (unsigned long)s >> 16;
-						if (hi == 0)
-							system_putch('0');
-						else
-						{
-							char i = 0;
-							while (hi)
-							{
-								str[i] = hi % 10 + '0';
-								hi /= 10;
-								i++;
-							}
-							while (i > 0)
-							{
-								i--;
-								system_putch(str[i]);
-							}
-						}
-						unsigned long l = s & 0xffff;
-						if (l)
-						{
-							str[0] = '.';
-							char j = 1;
-							for(char i=0; i<4; i++)
-							{
-								l *= 10;
-								str[j] = char(l >> 16) + '0';
-								j++;
-								l &= 0xfffful;
-							}
-							while (str[j-1] == '0')
-								j--;
-							if (str[j-1] == '.')
-								j--;
-							char i = 0;
-							while (i < j)
-							{
-								system_putch(str[i]);
-								i++;
-							}
-						}
+						long	s = valget(k);					
+						const char * str = number_format(s, true);
+						char i = 0;
+						while (str[i])
+							system_putch(str[i++]);
 
 					} break;
 				case TYPE_STRING:
@@ -918,6 +912,162 @@ void interpret_builtin(char n)
 			}
 			else
 				valpush(TYPE_NULL, 0);
+		} break;
+
+	case RTSYM_SEG:
+		{
+			int num = 250;
+			if (n > 2)
+			{
+				valderef(n - 3);
+				num = valget(n - 3) >> 16;
+			}
+
+			valderef(n - 1);
+			valderef(n - 2);
+			char t = typeget(n - 1);
+			if ((t & TYPE_MASK) == TYPE_STRING)
+			{
+				const char * str = valstring(n - 1, tmp);
+
+				int start = valget(n - 2) >> 16;
+				if (start < 0)
+					start == 0;
+	
+				esp += n + 1;
+
+				if (start >= str[0] || num <= 0)
+					valpush(TYPE_STRING_SHORT, 0);
+				else if (num == 1)
+					valpush(TYPE_STRING_SHORT, (unsigned long)str[start] << 16);
+				else
+				{
+					if (start + num > str[0])
+						num = str[0] - start;
+
+					MemString	*	ms = string_allocate(num);
+					if (ms)
+					{
+						char * dstr = ms->data;
+
+						t = 0;
+						for(char i=0; i<num; i++)
+							dstr[++t] = str[i + start + 1];
+						valpush(TYPE_STRING_HEAP, (unsigned)ms);
+					}
+					else
+						valpush(TYPE_NULL, 0);					
+				}
+			}
+			else
+			{
+				esp += n + 1;
+				valpush(TYPE_NULL, 0);					
+			}
+		} break;
+
+	case RTSYM_ASC:
+		{
+			valderef(0);
+			char t = typeget(0);
+			if ((t & TYPE_MASK) == TYPE_STRING)
+			{
+				const char * str = valstring(0, tmp);
+				esp += n + 1;
+				valpush(TYPE_NUMBER, str[0] > 0 ? (unsigned long)str[1] << 16 : 0);
+			}
+			else
+			{
+				esp += n + 1;
+				valpush(TYPE_NUMBER, 0);
+			}
+
+		} break;
+	case RTSYM_VAL:
+		{
+			valderef(0);
+			const char * str = valstring(0, tmp);
+
+			long l = number_parse(str + 1, str[0]);
+
+			esp += n + 1;
+			valpush(TYPE_NUMBER, l);		
+		} break;		
+	case RTSYM_STR:
+		{
+			valderef(0);
+			char t = typeget(0);
+			if ((t & TYPE_MASK) == TYPE_STRING)
+			{
+				estack[esp + n] = estack[esp];
+				esp += n;
+			}
+			else
+			{
+				long	s = valget(0);
+				
+				const char * str = number_format(s, true);
+
+				MemString	*	ms = string_allocate(str);
+
+				esp += n + 1;
+				valpush(TYPE_STRING_HEAP, (unsigned)ms);
+			}
+		} break;
+	case RTSYM_FLOOR:
+		{
+			valderef(0);
+			long li = valpop() & 0xffff0000ul;
+			esp += n;
+			valpush(TYPE_NUMBER, li);
+		} break;
+	case RTSYM_CEIL:
+		{
+			valderef(0);
+			long li = (valpop() + 0xffff) & 0xffff0000ul;
+			esp += n;
+			valpush(TYPE_NUMBER, li);
+		} break;
+
+	case RTSYM_FIND:
+		{
+			int start = 0;
+			if (n > 2)
+			{
+				valderef(n - 3);
+				start = valget(n - 3) >> 16;
+			}
+
+			valderef(n - 1);
+			valderef(n - 2);
+			char t = typeget(n - 1);
+			if ((t & TYPE_MASK) == TYPE_STRING)
+			{
+				const char * str = valstring(n - 1, tmp);
+				const char * find = valstring(n - 2, tmp2);
+
+				esp += n + 1;
+
+				while (start + find[0] <= str[0])
+				{
+					char i = 0;
+					while (i < find[0] && find[i + 1] == str[start + i + 1])
+						i++;
+					if (i == find[0])
+					{
+						valpush(TYPE_NUMBER, (unsigned long)start << 16);
+						return;
+					}
+					start++;
+				}
+
+				valpush(TYPE_NUMBER, 0xffff0000ul);
+			}
+			else
+			{
+				esp += n + 1;
+				valpush(TYPE_NUMBER, 0xffff0000ul);
+			}
 		} break;
 
 	default:
@@ -1173,57 +1323,6 @@ bool interpret_expression(void)
 				}
 			}	break;
 
-		case TK_STRUCTURE:
-			{
-				char n = tk[ti++];
-				__assume(n < VALUE_STACK_SIZE);
-				switch (t)
-				{
-				case TK_LIST:
-					if (n > 0)
-					{
-						char ei = esp + n - 1;
-						__assume(ei < VALUE_STACK_SIZE);
-						estack[ei] = estack[esp];
-						esp = ei;
-					}
-					break;
-				case TK_ARRAY:
-					{
-						MemArray	*	ma = array_allocate(n, n);
-						MemValues	*	mv = (MemValues *)(ma + 1);
-						for(char i=0; i<n; i++)
-						{
-							char ei = n - i - 1;
-							valderef(ei);
-							ei += esp;
-							__assume(ei < VALUE_STACK_SIZE);
-							mv->values[i] = estack[ei];
-						}
-						esp += n;
-						valpush(TYPE_ARRAY, (unsigned)ma);
-					} break;
-				case TK_STRUCT:
-					{
-						MemDict		*	md = dict_allocate(n);
-						MemValues	*	mv = (MemValues *)(md->mh);
-
-						for(char i=0; i<n; i++)
-						{
-							char ei = 2 * (n - i - 1);
-							valderef(ei);
-							valderef(ei + 1);
-							ei += esp;
-							__assume(ei < VALUE_STACK_SIZE);
-							md->symbols[i] = estack[ei + 1].value;
-							mv->values[i] = estack[ei];
-						}
-						esp += 2 * n;
-						valpush(TYPE_STRUCT, (unsigned)md);
-					} break;
-				}
-			}	break;
-
 		case TK_CONTROL:
 			{
 				switch (t)
@@ -1247,6 +1346,54 @@ bool interpret_expression(void)
 					valpush(TYPE_STRING_LITERAL, (unsigned)(tk + ti));
 					ti += tk[ti] + 1;
 					break;
+				case TK_LIST:
+					{
+						char n = tk[ti++];
+						__assume(n < VALUE_STACK_SIZE);
+						if (n > 0)
+						{
+							char ei = esp + n - 1;
+							__assume(ei < VALUE_STACK_SIZE);
+							estack[ei] = estack[esp];
+							esp = ei;
+						}
+					} 	break;
+				case TK_ARRAY:
+					{
+						char n = tk[ti++];
+						__assume(n < VALUE_STACK_SIZE);
+						MemArray	*	ma = array_allocate(n, n);
+						MemValues	*	mv = (MemValues *)(ma + 1);
+						for(char i=0; i<n; i++)
+						{
+							char ei = n - i - 1;
+							valderef(ei);
+							ei += esp;
+							__assume(ei < VALUE_STACK_SIZE);
+							mv->values[i] = estack[ei];
+						}
+						esp += n;
+						valpush(TYPE_ARRAY, (unsigned)ma);
+					} break;
+				case TK_STRUCT:
+					{
+						char n = tk[ti];
+						__assume(n < VALUE_STACK_SIZE);
+						MemDict		*	md = dict_allocate(tk + ti);
+						MemValues	*	mv = (MemValues *)(md->mh);
+
+						for(char i=0; i<n; i++)
+						{
+							char ei = n - i - 1;
+							valderef(ei);
+							ei += esp;
+							__assume(ei < VALUE_STACK_SIZE);
+							mv->values[i] = estack[ei];
+						}
+						esp += n;
+						ti += 2 * n + 1;
+						valpush(TYPE_STRUCT, (unsigned)md);
+					} break;
 				}
 			}
 		}
@@ -1342,6 +1489,7 @@ bool interpret_statement(void)
 
 				tk = callstack[csp].tk;
 				t =  callstack[csp].token;
+				callstack[csp].type = CSTACK_NONE;
 			} break;
 
 		case STMT_WHILE:

@@ -41,7 +41,9 @@ void edit_init(void)
 	cursory = 0;
 	screenx = 0;
 	screeny = 0;
-	*endtk++ = TK_END;
+	*endtk++ = 1;
+	*endtk++ = STMT_NONE;
+	*endtk++ = STMT_END;
 	limittk = (char *)0xfff0;
 }
 

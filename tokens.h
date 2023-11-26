@@ -39,7 +39,6 @@
 #define TK_PREFIX			0xa0
 #define TK_POSTFIX			0xb0
 #define TK_ASSIGN			0xc0
-#define TK_STRUCTURE		0xd0
 
 #define TK_CONTROL			0xf0
 
@@ -69,15 +68,15 @@
 #define TK_INDEX			(TK_POSTFIX + 0)
 #define TK_INVOKE			(TK_POSTFIX + 1)
 
-#define TK_LIST				(TK_STRUCTURE + 0)
-#define TK_ARRAY			(TK_STRUCTURE + 1)
-#define TK_STRUCT			(TK_STRUCTURE + 2)
 
 #define TK_END				(TK_CONTROL + 0)
 #define TK_COMMA			(TK_CONTROL + 1)
 #define TK_STRING			(TK_CONTROL + 2)
 #define TK_DOT				(TK_CONTROL + 3)
 #define TK_COLON			(TK_CONTROL + 4)
+#define TK_LIST				(TK_CONTROL + 5)
+#define TK_ARRAY			(TK_CONTROL + 6)
+#define TK_STRUCT			(TK_CONTROL + 7)
 
 #define STMT_END			0x00
 #define STMT_ERROR			0x01
@@ -129,6 +128,17 @@ struct Value
 char token_skip_expression(const char * tk);
 
 char token_skip_statement(const char * tk);
+
+bool is_letter(char c);
+
+bool is_exletter(char c);
+
+bool is_digit(char c);
+
+
+const char * number_format(unsigned long l, bool sign);
+
+unsigned long number_parse(const char * str, char n);
 
 
 #pragma compile("tokens.cpp")

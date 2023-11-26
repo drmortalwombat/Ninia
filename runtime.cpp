@@ -5,8 +5,8 @@
 #pragma bss( rtbss )
 
 __striped Value			globals[256];
-unsigned				global_symbols[256];
-unsigned				local_symbols[256];
+__striped unsigned		global_symbols[256];
+__striped unsigned		local_symbols[256];
 
 #pragma bss( bss )
 
@@ -29,6 +29,7 @@ unsigned global_add(unsigned symbol)
 	return num_globals++;
 }
 
+
 unsigned mem_start, mem_end, mem_final;
 
 void mem_init(void)
@@ -48,7 +49,7 @@ unsigned mh_size(MemHead * mh)
 	case MEM_VALUES:
 		return ((MemValues *)mh)->capacity * sizeof(Value) + sizeof(MemValues);
 	case MEM_DICT:
-		return ((MemDict *)mh)->size * sizeof(unsigned) + sizeof(MemDict);
+		return sizeof(MemDict);
 	default:
 		return sizeof(MemHead);
 	}

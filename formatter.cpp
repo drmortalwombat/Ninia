@@ -26,6 +26,47 @@ void format_insert2(char * str, char * color, char si, char ei, char c0, char c1
 	color[si + 1] = VCOL_MED_GREY;
 }
 
+char format_insert_sym(char * str, char * color, char si, char ei, char c, unsigned id)
+{
+	const char * s = symbol_string(id);
+	char n = 0;
+	while (n < 8 && s[n])
+		n++;
+
+	do {
+		ei--;
+		str[ei + n + 2] = str[ei];
+		color[ei + n + 2] = color[ei];
+	} while (si != ei);
+	str[si] = c;
+	color[si] = VCOL_MED_GREY;
+
+	for(char i=0; i<n; i++)
+	{
+		str[si + i + 1] = s[i];
+		color[si + i + 1] = VCOL_YELLOW;
+	}
+
+	str[si + n + 1] = ':';
+	color[si + n + 1] = VCOL_MED_GREY;
+
+	return n + 2;
+}
+
+char format_append(char * str, char * color, char si, char c, const char * src)
+{
+	char i = 0;
+	while (src[i])
+	{
+		str[si] = src[i];
+		color[si] = c;
+		si++;
+		i++;
+	}
+	return si;
+}
+
+
 const char binary_names[][2] = {
 	"+", "-", "*", "/", "%", "<<", ">>", "&", "|"
 };
@@ -45,60 +86,31 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 	char		stack[32];
 	char		sp = 0;
 
-	while (t != TK_END)
+	for(;;)
 	{
 		switch (t & 0xf0)
 		{
 		case TK_TINY_INT:
 			stack[sp++] = si;
-			utoa(t & 0x0f, str + si, 10);
-			while (str[si])
-			{
-				color[si] = VCOL_LT_GREY;
-				si++;
-			}
+			si = format_append(str, color, si, VCOL_LT_GREY, number_format((unsigned long)(t & 0x0f) << 16, false));
 			break;
 		case TK_SMALL_INT:
 			stack[sp++] = si;
-			utoa(((t & 0x0f) << 8) | tk[ti++], str + si, 10);
-			while (str[si])
-			{
-				color[si] = VCOL_LT_GREY;
-				si++;
-			}
+			si = format_append(str, color, si, VCOL_LT_GREY, number_format((unsigned long)(((t & 0x0f) << 8) | tk[ti++]) << 16, false));
 			break;
 		case TK_NUMBER:
 			{
 				stack[sp++] = si;
-				unsigned f = (tk[ti++] << 8);
-				f |= tk[ti++];
-				utoa(f, str + si, 10);
-				while (str[si])
-				{
-					color[si] = VCOL_LT_GREY;
-					si++;
-				}
+
 				unsigned long l = tk[ti++];
 				l <<= 8;
-				l |= tk[ti++]; 
-				if (l)
-				{
-					str[si] = '.';
-					color[si] = VCOL_LT_GREY;
-					si++;
-					for(char i=0; i<4; i++)
-					{
-						l *= 10;
-						str[si] = char(l >> 16) + '0';
-						color[si] = VCOL_LT_GREY;
-						si++;
-						l &= 0xfffful;
-					}
-					while (str[si-1] == '0')
-						si--;
-					if (str[si-1] == '.')
-						si--;
-				}
+				l |= tk[ti++];
+				l <<= 8;
+				l |= tk[ti++];
+				l <<= 8;
+				l |= tk[ti++];
+
+				si = format_append(str, color, si, VCOL_LT_GREY, number_format(l, false));
 			}	break;
 
 		case TK_IDENT:
@@ -208,64 +220,9 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 			}
 			break;
 
-		case TK_STRUCTURE:
-			{
-				char n = tk[ti++];
-				while (n > 1)
-				{
-					format_insert(str, color, stack[--sp], si, ',');
-					si++;
-					n--;
-				}
-				switch (t)
-				{
-				case TK_LIST:
-					if (n)
-						format_insert(str, color, stack[sp-1], si, '(');
-					else
-					{
-						str[si] = '(';
-						color[si] = VCOL_MED_GREY;
-					}
-					str[si + 1] = ')';
-					color[si + 1] = VCOL_MED_GREY;
-					si += 2;
-					break;
-				case TK_ARRAY:
-					if (n)
-						format_insert(str, color, stack[sp-1], si, '[');
-					else
-					{
-						stack[sp++] = si;
-						str[si] = '[';
-						color[si] = VCOL_MED_GREY;
-					}
-					str[si + 1] = ']';
-					color[si + 1] = VCOL_MED_GREY;
-					si += 2;
-					break;
-				case TK_STRUCT:
-					if (n)
-						format_insert(str, color, stack[sp-1], si, '{');
-					else
-					{
-						stack[sp++] = si;
-						str[si] = '{';
-						color[si] = VCOL_MED_GREY;
-					}
-					str[si + 1] = '}';
-					color[si + 1] = VCOL_MED_GREY;
-					si += 2;
-					break;
-				}
-			}
-			break;
-
 		case TK_CONTROL:
 			switch (t)
 			{
-			case TK_END:
-				break;
 			case TK_COMMA:
 				str[si] = ',';
 				color[si] = VCOL_MED_GREY;
@@ -308,27 +265,63 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 					color[si] = VCOL_MED_GREY;
 					si++;
 				} break;
+				case TK_LIST:
+				case TK_ARRAY:
+				{
+					char n = tk[ti++];
+					while (n > 1)
+					{
+						format_insert(str, color, stack[--sp], si, ',');
+						si++;
+						n--;
+					}
+
+					if (n)
+						format_insert(str, color, stack[sp-1], si, t == TK_LIST ? '(' : '[');
+					else
+					{
+						str[si] = t == TK_LIST ? '(' : '[';
+						color[si] = VCOL_MED_GREY;
+					}
+					str[si + 1] = t == TK_LIST ? ')' : ']';
+					color[si + 1] = VCOL_MED_GREY;
+					si += 2;
+				}	break;
+
+				case TK_STRUCT:
+				{
+					char n = tk[ti++];
+					if (n)
+					{
+						char i = n;
+						while (i > 0)
+						{
+							i--;
+							si += format_insert_sym(str, color, stack[--sp], si, i == 0 ? '{' : ',', (tk[ti + 2 * i + 1] << 8) | tk[ti + 2 * i]);
+						}
+						sp++;
+					}
+					else
+					{
+						str[si] = '{';
+						color[si] = VCOL_MED_GREY;
+						si ++;
+					}
+					str[si] = '}';
+					color[si] = VCOL_MED_GREY;
+					si ++;
+					ti += 2 * n;
+				} break;
+
+				case TK_END:
+					str[si] = 0;
+					return tk + ti;
 			}
 			break;
 		}
 		t = tk[ti++];
 	}
 
-	str[si] = 0;
-	return tk + ti;
-}
-
-char format_append(char * str, char * col, char si, const char * src)
-{
-	char j = 0;
-	while (src[j])
-	{
-		str[si] = src[j];
-		col[si] = VCOL_WHITE;
-		si++;
-		j++;
-	}
-	return si;
 }
 
 const char * format_statement(const char * tk, char * str, char * col)
@@ -348,30 +341,30 @@ const char * format_statement(const char * tk, char * str, char * col)
 		case STMT_EXPRESSION:
 			return format_expression(tk, str, col, l);
 		case STMT_WHILE:
-			l = format_append(str, col, l, p"WHILE ");
+			l = format_append(str, col, l, VCOL_WHITE, p"WHILE ");
 			return format_expression(tk + 2, str, col, l);
 		case STMT_IF:
-			l = format_append(str, col, l, p"IF ");
+			l = format_append(str, col, l, VCOL_WHITE, p"IF ");
 			return format_expression(tk + 2, str, col, l);
 		case STMT_ELSIF:
-			l = format_append(str, col, l, p"ELSIF ");
+			l = format_append(str, col, l, VCOL_WHITE, p"ELSIF ");
 			return format_expression(tk + 2, str, col, l);
 		case STMT_ELSE:
-			l = format_append(str, col, l, p"ELSE");
+			l = format_append(str, col, l, VCOL_WHITE, p"ELSE");
 			str[l] = 0;
 			return tk + 2;
 		case STMT_VAR:
-			l = format_append(str, col, l, p"VAR ");
+			l = format_append(str, col, l, VCOL_WHITE, p"VAR ");
 			return format_expression(tk, str, col, l);
 		case STMT_RETURN:
-			l = format_append(str, col, l, p"RETURN ");
+			l = format_append(str, col, l, VCOL_WHITE, p"RETURN ");
 			return format_expression(tk, str, col, l);
 		case STMT_RETURN_NULL:
-			l = format_append(str, col, l, p"RETURN");
+			l = format_append(str, col, l, VCOL_WHITE, p"RETURN");
 			str[l] = 0;
 			return tk;
 		case STMT_DEF:
-			l = format_append(str, col, l, p"DEF ");
+			l = format_append(str, col, l, VCOL_WHITE, p"DEF ");
 			return format_expression(tk + 2, str, col, l);
 		case STMT_NONE:
 			str[l] = 0;

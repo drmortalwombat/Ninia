@@ -4,8 +4,8 @@
 
 extern __striped Value	globals[256];
 
-extern unsigned			global_symbols[256];
-extern unsigned			local_symbols[256];
+extern __striped unsigned			global_symbols[256];
+extern __striped unsigned			local_symbols[256];
 
 extern char	num_globals, num_local_symbols;
 
@@ -32,9 +32,8 @@ struct MemArray : MemHead
 
 struct MemDict : MemHead
 {
-	MemHead	*	mh;
-	char		size;
-	unsigned	symbols[0];
+	MemHead		*	mh;
+	const char	*	symbols;
 };
 
 

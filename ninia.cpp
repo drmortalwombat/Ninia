@@ -16,13 +16,13 @@
 
 void tokens_load(const char * name)
 {
-	char	buffer[32];
-	strcpy(buffer, "0:");
-	strcat(buffer, name);
-	strcat(buffer, ",P,R");
+	char	xname[32];
+	strcpy(xname, "0:");
+	strcat(xname, name);
+	strcat(xname, ",P,R");
 
 	mmap_set(MMAP_NO_BASIC);
-	krnio_setnam(buffer);
+	krnio_setnam(xname);
 	if (krnio_open(2, 9, 2))
 	{				
 		edit_init();
@@ -58,13 +58,13 @@ void tokens_load(const char * name)
 
 void tokens_save(const char * name)
 {
-	char	buffer[32];
-	strcpy(buffer, "@0:");
-	strcat(buffer, name);
-	strcat(buffer, ",P,W");
+	char	xname[32];
+	strcpy(xname, "@0:");
+	strcat(xname, name);
+	strcat(xname, ",P,W");
 
 	mmap_set(MMAP_NO_BASIC);
-	krnio_setnam(name);
+	krnio_setnam(xname);
 	if (krnio_open(2, 9, 2))
 	{				
 		krnio_chkout(2);
@@ -244,7 +244,7 @@ int main(void)
 	endtk = tk;
 #endif
 
-	tokens_load("PLOT.NIN");
+	tokens_load("SPLIT.NIN");
 
 	system_show_editor();
 	edit_refresh_screen();
@@ -400,7 +400,19 @@ int main(void)
 				while (interpret_statement() && !runtime_error && *(volatile char *)0x91 != 0x7f)
 					;
 				restore_statements(starttk);
-				if (!runtime_error)
+				if (runtime_error)
+				{
+					unsigned line = edit_token_to_line(exectk);
+					cursortk = edit_line_to_token(line);
+					if (line < screeny || line > screeny + 24)
+					{
+						screeny = line;
+						cursory = 0;
+					}
+					else
+						cursory = line - screeny;
+				}
+				else
 					system_getch();
 				system_show_editor();
 				redraw = true;
