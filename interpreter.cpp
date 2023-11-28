@@ -3,6 +3,8 @@
 #include "symbols.h"
 #include "errors.h"
 #include <fixmath.h>
+#include <time.h>
+#include <conio.h>
 
 __zeropage char		esp;
 
@@ -247,7 +249,10 @@ void prepare_statements(char * tk)
 				pt = tk;
 				tk += 2;
 				pl++;
-				break;					
+				break;		
+			case STMT_COMMENT:
+				tk += tk[0] + 1;
+				break;
 			}
 		}
 		l = *tk;
@@ -426,6 +431,9 @@ void restore_statements(char * tk)
 				tk[1] = 0;
 				tk = restore_function(tk + 2);
 				break;				
+			case STMT_COMMENT:
+				tk += tk[0] + 1;
+				break;
 			}
 		}
 		l = *tk;
@@ -725,7 +733,7 @@ MemString * string_allocate(const char * str)
 
 void interpret_builtin(char n)
 {
-	char tmp[2], tmp2[2];
+	char tmp[80], tmp2[2];
 	unsigned lf = valget(n);
 
 	if ((lf & 0xff00) != 0x0100)
@@ -755,6 +763,29 @@ void interpret_builtin(char n)
 		esp += n + 1;
 		valpush(TYPE_NUMBER, rand());
 		break;
+	case RTSYM_TIME:
+		{
+			long l = clock();
+			esp += n + 1;
+			valpush(TYPE_NUMBER, lmul16f16s(l, 0x04444444l));
+		}	break;
+	case RTSYM_CHRIN:
+		{
+			char ch = system_getchx();
+			esp += n + 1;
+			valpush(TYPE_NUMBER, (long)ch << 16);
+		} break;
+	case RTSYM_INPUT:
+		{
+			char i = 0;
+			while ((char c = system_readch()) != PETSCII_RETURN)
+				tmp[i++] = c;
+			tmp[i] = 0;
+			MemString	*	ms = string_allocate(tmp);
+
+			esp += n + 1;
+			valpush(TYPE_STRING_HEAP, (unsigned)ms);
+		} break;
 	case RTSYM_PRINT:
 		{
 			for(char i=0; i<n; i++)
@@ -786,12 +817,17 @@ void interpret_builtin(char n)
 		} break;
 	case RTSYM_POKE:
 		{
-			valderef(0);
-			char v = (unsigned long)valpop() >> 16;
-			valderef(0);			
-			volatile char * lp = (char *)((unsigned long)valpop() >> 16);
-			*lp = v;
-			esp += n - 1;
+			for(char i=0; i<n; i+=2)
+			{
+				char k = n - i - 1;
+				valderef(k);
+				valderef(k-1);	
+
+				volatile char * lp = (char *)((unsigned long)valget(k) >> 16);
+				char v = (unsigned long)valget(k-1) >> 16;
+				*lp = v;
+			}
+			esp += n + 1;
 			valpush(TYPE_NULL, 0);
 		} break;
 	case RTSYM_PEEK:
@@ -988,7 +1024,8 @@ void interpret_builtin(char n)
 			valderef(0);
 			const char * str = valstring(0, tmp);
 
-			long l = number_parse(str + 1, str[0]);
+			long l;
+			number_parse(str + 1, str[0], l);
 
 			esp += n + 1;
 			valpush(TYPE_NUMBER, l);		
@@ -1262,8 +1299,30 @@ bool interpret_expression(void)
 					valderef(0);
 					long ei = valpop();
 					valderef(0);
-					estack[esp].type = TYPE_ARRAY_REF;
-					estack[esp].value |= ei & 0xffff0000ul;
+					char t = typeget(0);
+					if (t == TYPE_ARRAY)
+					{
+						estack[esp].type = TYPE_ARRAY_REF;
+						estack[esp].value |= ei & 0xffff0000ul;
+					}
+					else if ((t & TYPE_MASK) == TYPE_STRING)
+					{
+						char tmp[2];
+						const char * s = valstring(0, tmp);
+						int si = ei >> 16;
+						if (si >= 0 && si < s[0])
+						{
+							esp++;
+							valpush(TYPE_STRING_SHORT, (unsigned long)s[si + 1] << 16);
+						}
+						else
+						{
+							esp++;
+							valpush(TYPE_STRING_SHORT, 0);
+						}
+					}
+					else
+						runtime_error = RERR_INVALID_TYPES;
 					break;
 				}
 			case TK_INVOKE:
@@ -1451,6 +1510,9 @@ bool interpret_statement(void)
 	case STMT_IF:
 		tk += 4;
 		break;
+	case STMT_COMMENT:
+		exectk = tk + tk[2] + 3;
+		return true;
 	default:
 		tk += 2;
 	}
@@ -1509,7 +1571,10 @@ bool interpret_statement(void)
 
 			tk = (char *)(etk[2] + (etk[3] << 8));
 			if (tk[0] != etk[0])
+			{
+				exectk = tk;
 				return true;
+			}
 
 			if (tk[1] == STMT_ELSE)
 			{

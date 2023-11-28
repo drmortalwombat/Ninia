@@ -20,12 +20,18 @@ void edit_scroll_up(void);
 
 void edit_scroll_down(void);
 
-char edit_line(void);
-
 char * edit_screen_to_token(char y);
 
 unsigned edit_token_to_line(const char * c);
 
 char * edit_line_to_token(unsigned y);
+
+
+char edit_line(void);
+
+char edit_text(void);
+
+bool edit_cmd(const char * name, char * cmd);
+
 
 #pragma compile("editor.cpp")

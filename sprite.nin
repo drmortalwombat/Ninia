@@ -1,0 +1,63 @@
+# Convert one hex nibble
+DEF hexn(s)
+ IF s>="a"
+  RETURN asc(s)-55
+ ELSE
+  RETURN asc(s)-48
+
+# Convert one hex byte from
+# string at offset i
+DEF hexb(s,i)
+ RETURN hexn(s[i])<<4|hexn(s[i+1])
+
+# Poke a series of hex bytes
+# into memory
+DEF pkhex(a,s)
+ VAR i=0
+ WHILE 2*i<len(s)
+  poke(a+i,hexb(s,2*i))
+  i+=1
+
+# Move a sprite to position
+DEF sprmove(s,x,y)
+ VAR r=peek(53264)
+ VAR m=1<<s
+ IF x>=256
+  r=r|m
+ ELSE
+  r=r&!m
+ poke(53264,r,53248+2*s,x&255,53249+2*s,y)
+
+# Sprite image data
+pkhex(832,"00ff0003ffc00ffff01ffff83ffffc")
+pkhex(847,"3ffffc7ffffe7ffffe7ffffeffffff")
+pkhex(862,"ffffffffffff7ffffe7ffffe7ffffe")
+pkhex(877,"3ffffc3ffffc1ffff80ffff003ffc0")
+pkhex(892,"00ff00")
+
+# Show sprite
+poke(2040,13)
+poke(53269,1)
+
+# Sprite movement loop, fixed x
+# velocity and y gravity
+VAR x=160,y=60,dx=1.3,dy=0
+WHILE 1
+ # Apply velocity
+ x+=dx
+ y+=dy
+ # Move sprite
+ sprmove(0,floor(x),floor(y))
+ # Check border collision
+ IF x<24|x>320
+  dx=-dx
+  x+=dx
+ IF y<50|y>229
+  dy=-dy
+  y+=dy
+ # Apply gravity
+ dy+=0.05
+
+
+
+

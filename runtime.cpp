@@ -30,12 +30,14 @@ unsigned global_add(unsigned symbol)
 }
 
 
-unsigned mem_start, mem_end, mem_final;
+unsigned mem_end;
+
+static const unsigned mem_start = 0xa000;
+static const unsigned mem_final = 0xc000;
 
 void mem_init(void)
 {
-	mem_start = mem_end = 0xa000;
-	mem_final = 0xc000;
+	mem_end = mem_start;
 }
 
 unsigned mh_size(MemHead * mh)

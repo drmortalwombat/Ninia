@@ -298,7 +298,7 @@ char edit_line(void)
 			case S'B':
 			case PETSCII_CURSOR_UP:
 			case PETSCII_CURSOR_DOWN:
-			case '\n':
+			case PETSCII_RETURN:
 			case PETSCII_F1:
 			case PETSCII_F2:
 			case PETSCII_F3:
@@ -334,7 +334,7 @@ char edit_line(void)
 
 				int nsz = parse_statement(ebuffer, buffer) - buffer;
 
-				if (ch == '\n')
+				if (ch == PETSCII_RETURN)
 				{
 					if (upy > cursory)
 					{
@@ -498,5 +498,265 @@ void edit_show_status(void)
 		dp[i] = 160;
 		cp[i] = color;
 		i++;		
+	}
+}
+
+
+char edit_text(void)
+{
+	bool	redraw = true;
+
+	for(;;)
+	{
+		if (redraw)
+			edit_refresh_screen();
+		redraw = false;
+
+		edit_show_status();
+		char ch = edit_line();
+		switch (ch)
+		{
+		case PETSCII_CURSOR_DOWN:
+			if (*cursortk)
+			{
+				cursory++;
+				redraw = marktk != nullptr;
+			}
+			break;
+		case PETSCII_CURSOR_UP:
+			if (cursortk != starttk)
+			{
+				cursory--;
+				redraw = marktk != nullptr;
+			}
+			break;
+		case PETSCII_DEL:
+			if (cursory > 0)
+			{
+				if (marktk)
+				{
+					marktk = nullptr;
+					redraw = true;
+				}
+
+				cursory--;
+				char * prevtk = screentk;
+				char i = 0;
+				while (i < cursory)
+				{
+					prevtk += token_skip_statement(prevtk);
+					i++;
+				}
+
+				if (token_skip_statement(prevtk) == 2)
+				{
+					// delete previous line
+					memmove(prevtk, cursortk, endtk - cursortk);
+					endtk -= 2;
+					cursortk = prevtk;
+					edit_refresh_screen();									
+				}
+				else if (token_skip_statement(cursortk) == 2)
+				{
+					// delete current line
+					memmove(cursortk, cursortk + 2, endtk - cursortk - 2);
+					endtk -= 2;
+					edit_refresh_screen();
+					cursortk = prevtk;
+					cursorx = 255;
+				}
+				else
+					cursory++;
+			}
+			break;
+		case PETSCII_RETURN:
+			if (*cursortk)
+			{
+				cursory++;
+				cursortk += token_skip_statement(cursortk);
+				cursorx = *cursortk - 1;
+			}
+			break;
+		case S'Y':
+			if (*cursortk)
+			{
+				marktk = nullptr;
+
+				char len = token_skip_statement(cursortk);
+				char * nexttk = cursortk + len;
+				memmove(cursortk, nexttk, endtk - nexttk);
+				endtk -= len;
+				redraw = true;
+			} 
+			break;
+		case S'X':
+			if (marktk && cursortk > marktk)
+			{
+				unsigned	sz = cursortk - marktk;
+				blocktk = limittk - sz;
+
+				memcpy(blocktk, marktk, sz);
+				memmove(marktk, cursortk, endtk - cursortk);
+				endtk -= sz;
+				cursortk = marktk;
+				marktk = nullptr;
+
+				unsigned	line = edit_token_to_line(cursortk);
+				if (line < screeny || line > screeny + 24)
+				{
+					screeny = line;
+					cursory = 0;
+				}
+				else
+					cursory = line - screeny;
+				redraw = true;
+			} 
+			break;
+		case S'V':
+			if (blocktk)
+			{
+				marktk = cursortk;
+				unsigned	sz = limittk - blocktk;
+				cursortk += sz;
+				memmove(cursortk, marktk, endtk - marktk);
+				memcpy(marktk, blocktk, sz);
+				endtk += sz;
+
+				unsigned	line = edit_token_to_line(cursortk);
+				if (line < screeny || line > screeny + 24)
+				{
+					screeny = line;
+					cursory = 0;
+				}
+				else
+					cursory = line - screeny;
+				redraw = true;
+			}
+			break;
+		case S'C':
+			if (marktk && cursortk > marktk)
+			{
+				unsigned	sz = cursortk - marktk;
+				blocktk = limittk - sz;
+				memcpy(blocktk, marktk, sz);
+				marktk = nullptr;
+			}
+			break;
+		case S'B':
+			if (marktk)
+				marktk = nullptr;
+			else
+				marktk = cursortk;
+			redraw = true;
+			break;
+		case PETSCII_F6:
+			parse_pretty(starttk);
+			redraw = true;
+			break;
+		case PETSCII_F1:
+		case PETSCII_F2:
+		case PETSCII_F5:
+			return ch;
+		}
+
+		if (cursortk < marktk)
+			marktk = nullptr;
+
+		if (cursory < 3 && screeny > 0)
+		{
+			edit_scroll_down();
+			cursory++;
+		}
+		else if (cursory > 20)
+		{
+
+			edit_scroll_up();
+			cursory--;
+		}
+
+		cursortk = screentk;
+		for(char i=0; i<cursory; i++)
+			cursortk += token_skip_statement(cursortk);
+
+	}	
+}
+
+
+bool edit_cmd(const char * name, char * cmd)
+{
+	char * dp = Screen + 24 * 40;
+	char * ep = dp + 5;
+
+	for(char i=0; i<4; i++)
+		dp[i] = p2s(name[i]) | 0x80;
+
+	dp[4] = s'[' | 0x80;
+	dp[17] = s']' | 0x80;
+
+	char cx = 12;
+	for(;;)
+	{
+		char n = 0;
+		while (cmd[n])
+		{
+			ep[n] = p2s(cmd[n]) | 0x80;
+			n++;
+		}
+		char i = n;
+		while (i < 12)
+			ep[i++] = ' ' | 0x80;
+		if (cx > n)
+			cx = n;
+
+		ep[cx] ^= 0x80;
+		char ch = system_getch();
+		ep[cx] ^= 0x80;
+
+		switch (ch)
+		{
+		case PETSCII_CURSOR_LEFT:
+			if (cx > 0) cx--;
+			break;
+		case PETSCII_CURSOR_RIGHT:
+			if (cx < n) cx++;
+			break;
+
+		case 95:
+			cx = n;
+			break;
+		case PETSCII_HOME:
+			cx = 0;
+			break;
+
+		case PETSCII_DEL:
+			if (cx > 0)
+			{
+				cx--;
+				char i = cx;
+				while (i < n)
+				{
+					cmd[i] = cmd[i+1];
+					i++;
+				}
+			}
+			break;
+		case PETSCII_RETURN:
+			return true;
+		case S'C':
+			return false;
+		default:
+			if (n < 12)
+			{
+				char i = n + 1;
+				while (i > cx)
+				{
+					i--;
+					cmd[i + 1] = cmd[i];
+				}
+				cmd[cx] = ch;
+				cx++;
+			}
+			break;
+		}
 	}
 }

@@ -1,0 +1,8 @@
+print("Name:")
+VAR a=input()
+print("\n")
+
+print("Your name is: ",a,"\n")
+
+
+

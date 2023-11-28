@@ -1,0 +1,22 @@
+DEF split(s,k)
+ VAR a=[]
+ VAR i=find(s,k)
+ VAR pi = 0
+ WHILE i>=0
+  push(a,seg(s,pi,i-pi))
+  pi=i+len(k)
+  i=find(s,k,pi)
+ push(a,seg(s,pi,len(s)-pi))
+ RETURN a
+ 
+DEF pa(a)
+ VAR i=0
+ WHILE i<len(a)
+  IF i
+   print(",")
+  print(a[i])
+  i=i+1
+
+VAR t=split("123,456,789,bcd",",")
+
+pa(t)

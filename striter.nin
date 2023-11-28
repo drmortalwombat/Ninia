@@ -1,0 +1,14 @@
+chrout(14)
+
+DEF do(c)
+ print("(",c,")\n")
+
+DEF sep(s,l)
+ VAR i=0
+ WHILE i<len(s)
+  l(s[i])
+  i+=1
+
+sep("Hello World",do)
+
+

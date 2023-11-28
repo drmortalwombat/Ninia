@@ -1,0 +1,31 @@
+DEF point(x,y)
+ RETURN {x:x,y:y}
+
+DEF draw(pt)
+ poke(1024+40*floor(pt.y)+floor(pt.x),81)
+
+VAR a=array(0)
+
+VAR i=0
+WHILE i<40
+ push(a,point(i,i*0.5))
+ i+=1
+
+VAR ti=time()
+
+i=0
+WHILE i<len(a)
+ draw(a[i])
+ i+=1
+
+print("Time:",time()-ti)
+
+
+
+
+
+
+
+
+
+

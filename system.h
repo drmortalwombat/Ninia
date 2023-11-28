@@ -24,4 +24,6 @@ char system_getch(void);
 
 char system_getchx(void);
 
+char system_readch(void);
+
 #pragma compile("system.cpp")

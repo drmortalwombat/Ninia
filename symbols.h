@@ -27,6 +27,10 @@ void symbols_init(void);
 #define RTSYM_FLOOR		0x10
 #define RTSYM_CEIL		0x11
 #define RTSYM_FIND		0x12
+#define RTSYM_TIME		0x13
+#define RTSYM_CHRIN		0x14
+#define RTSYM_INPUT		0x15
+
 
 unsigned symbol_add(const char * s);
 

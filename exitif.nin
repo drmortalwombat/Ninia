@@ -1,0 +1,6 @@
+WHILE 1
+ print("a")
+ IF 0
+  print("b")
+ #x
+

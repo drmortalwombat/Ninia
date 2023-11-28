@@ -63,7 +63,7 @@ static FontPatch fontpatch[] = {
 		0b00110000,
 		0b00110000,
 		0b00110000,
-		0b00110000,
+		0b00000000,
 		0b00110000,
 		0b00110000,
 		0b00110000,
@@ -103,6 +103,7 @@ void system_show_editor(void)
 
 	vic.color_border = VCOL_BLACK;
 	vic.color_back = VCOL_BLACK;	
+	vic.spr_enable = 0;
 }
 
 void system_show_runtime(void)
@@ -119,23 +120,55 @@ void system_show_runtime(void)
 
 void system_putch(char ch)
 {
-	mmap_set(MMAP_NO_BASIC);
-	putch(ch);
-	mmap_set(MMAP_NO_ROM);
+	__asm
+	{
+		lda ch
+		ldx #MMAP_NO_BASIC
+		stx $01
+		jsr $ffd2
+		ldx #MMAP_NO_ROM
+		stx $01
+	}
+}
+
+char system_readch(void)
+{	
+	__asm
+	{
+		ldx #MMAP_NO_BASIC
+		stx $01
+	l1:
+		jsr $ffcf
+		ldx #MMAP_NO_ROM
+		stx $01
+		sta accu
+	}
 }
 
 char system_getch(void)
 {	
-	mmap_set(MMAP_NO_BASIC);
-	char ch = getch();
-	mmap_set(MMAP_NO_ROM);	
-	return ch;
+	__asm
+	{
+		ldx #MMAP_NO_BASIC
+		stx $01
+	l1:
+		jsr $ffe4
+		beq l1
+		ldx #MMAP_NO_ROM
+		stx $01
+		sta accu
+	}
 }
 
 char system_getchx(void)
 {	
-	mmap_set(MMAP_NO_BASIC);
-	char ch = getchx();
-	mmap_set(MMAP_NO_ROM);	
-	return ch;
+	__asm
+	{
+		ldx #MMAP_NO_BASIC
+		stx $01
+		jsr $ffe4
+		ldx #MMAP_NO_ROM
+		stx $01
+		sta accu
+	}
 }

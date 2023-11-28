@@ -1,0 +1,21 @@
+VAR x=20,y=10
+VAR dx=1,dy=1
+
+WHILE 1
+ VAR px=x,py=y
+ x+=dx
+ y+=dy
+ IF x>=40|x<0
+  dx=-dx
+  x+=dx
+ IF y>=25|y<0
+  dy=-dy
+  y+=dy
+ poke(1024+40*y+x,81)
+ poke(1024+40*py+px,32)
+
+
+
+
+
+

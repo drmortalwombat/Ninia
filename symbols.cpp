@@ -30,6 +30,9 @@ const char *	rtsymbols[]  =
 	p"floor",
 	p"ceil",
 	p"find",
+	p"time",
+	p"chrin",
+	p"input",
 };
 
 #define NUM_RTSYMBOLS	(sizeof(rtsymbols) / sizeof(char *))

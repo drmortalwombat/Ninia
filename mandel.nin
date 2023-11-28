@@ -1,0 +1,37 @@
+DEF plot(x,y,c)
+ poke(1024+40*y+x,160)
+ poke(55296+40*y+x,c)
+
+VAR ti=time()
+VAR iy=0,sy=-0.9
+WHILE iy<25
+ VAR ix=0,sx=-2
+ WHILE ix<40
+  VAR mx=0,my=0,d=0
+  VAR xx=mx*mx,yy=my*my
+  WHILE xx+yy<4&d<16
+   my=2*mx*my+sy
+   mx=xx-yy+sx
+   xx=mx*mx,yy=my*my
+   d+=1
+  plot(ix,iy,d)
+  sx+=0.075
+  ix+=1
+ sy+=0.075
+ iy+=1
+print("Time:",time()-ti)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

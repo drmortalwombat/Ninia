@@ -81,6 +81,7 @@
 #define STMT_END			0x00
 #define STMT_ERROR			0x01
 #define STMT_NONE			0x02
+#define STMT_COMMENT		0x03
 
 #define STMT_EXPRESSION		0x10
 #define STMT_VAR			0x11
@@ -138,7 +139,7 @@ bool is_digit(char c);
 
 const char * number_format(unsigned long l, bool sign);
 
-unsigned long number_parse(const char * str, char n);
+char number_parse(const char * str, char n, long & lr);
 
 
 #pragma compile("tokens.cpp")

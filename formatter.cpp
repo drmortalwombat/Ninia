@@ -276,7 +276,7 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 						n--;
 					}
 
-					if (n)
+					if (n > 0)
 						format_insert(str, color, stack[sp-1], si, t == TK_LIST ? '(' : '[');
 					else
 					{
@@ -338,6 +338,22 @@ const char * format_statement(const char * tk, char * str, char * col)
 		char t = *tk++;
 		switch (t)
 		{
+		case STMT_COMMENT:
+			{
+				str[l] = '#';
+				col[l] = VCOL_PURPLE;
+				l++;
+				
+				char n = *tk++;
+				while (n)
+				{
+					str[l] = *tk++;
+					col[l] = VCOL_PURPLE;
+					l++;
+					n--;
+				}
+				str[l] = 0;
+			} break;			
 		case STMT_EXPRESSION:
 			return format_expression(tk, str, col, l);
 		case STMT_WHILE:

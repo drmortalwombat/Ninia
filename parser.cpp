@@ -123,7 +123,8 @@ char * parse_expression(const char * str, char * tk)
 {
 	osp = 0;
 
-	char 	c = *str++;
+	char	si = 0;
+	char 	c = str[si++];
 	char	ni = 0;
 	bool	prefix = true;
 	for(;;)
@@ -138,14 +139,14 @@ char * parse_expression(const char * str, char * tk)
 			return tk + ni;
 
 		case ' ':
-			c = *str++;
+			c = str[si++];
 			break;			
 		case '(':
 			if (prefix)
 				ostack[osp++] = TK_LIST;
 			else
 				ostack[osp++] = TK_INVOKE;
-			c = *str++;
+			c = str[si++];
 			prefix = true;
 			break;
 		case '[':
@@ -153,13 +154,13 @@ char * parse_expression(const char * str, char * tk)
 				ostack[osp++] = TK_ARRAY;
 			else
 				ostack[osp++] = TK_INDEX;
-			c = *str++;
+			c = str[si++];
 			prefix = true;
 			break;
 		case '{':
 		case 219:
 			ostack[osp++] = TK_STRUCT;
-			c = *str++;
+			c = str[si++];
 			prefix = true;
 			break;
 		case ')':
@@ -167,40 +168,40 @@ char * parse_expression(const char * str, char * tk)
 		case '}':
 		case 221:
 			ni = close_op(tk, ni, prefix);
-			c = *str++;
+			c = str[si++];
 			prefix = false;
 			break;
 		case ',':
 			ni = parse_comma(tk, ni);
-			c = *str++;
+			c = str[si++];
 			prefix = true;
 			break;
 		case ':':
 			ni -= 2;
 			symlist[osp-1] = ((tk[ni] & 0x0f) << 16) | tk[ni + 1];
-			c = *str++;
+			c = str[si++];
 			prefix = true;
 			break;
 		case '+':
 			if (prefix)
 				return nullptr;
 
-			c = *str++;
+			c = str[si++];
 			if (c == '=')
 			{
 				ni = parse_op(tk, ni, TK_ASSIGN_ADD);
-				c = *str++;
+				c = str[si++];
 			}
 			else
 				ni = parse_op(tk, ni, TK_ADD);
 			prefix = true;
 			break;
 		case '-':
-			c = *str++;
+			c = str[si++];
 			if (c == '=')
 			{
 				ni = parse_op(tk, ni, TK_ASSIGN_SUB);
-				c = *str++;
+				c = str[si++];
 			}
 			else
 			{
@@ -214,73 +215,84 @@ char * parse_expression(const char * str, char * tk)
 			break;
 		case '*':
 			ni = parse_op(tk, ni, TK_MUL);
-			c = *str++;
+			c = str[si++];
 			prefix = true;
 			break;
 		case '/':
 			ni = parse_op(tk, ni, TK_DIV);
-			c = *str++;
+			c = str[si++];
+			prefix = true;
+			break;
+		case '&':
+			ni = parse_op(tk, ni, TK_AND);
+			c = str[si++];
+			prefix = true;
+			break;
+		case '|':
+		case 220:
+			ni = parse_op(tk, ni, TK_OR);
+			c = str[si++];
 			prefix = true;
 			break;
 		case '%':
 			ni = parse_op(tk, ni, TK_MOD);
-			c = *str++;
+			c = str[si++];
 			prefix = true;
 			break;
 		case '.':
 			ni = parse_op(tk, ni, TK_DOT);
-			c = *str++;
+			c = str[si++];
 			prefix = true;
 			break;
 		case '!':
-			c = *str++;
+			c = str[si++];
 			if (c == '=')
 			{
 				ni = parse_op(tk, ni, TK_NOT_EQUAL);
-				c = *str++;
+				c = str[si++];
 			}
 			else
 				ni = parse_op(tk, ni, TK_NOT);
 			prefix = true;
 			break;
 		case '=':
-			c = *str++;
+			c = str[si++];
 			if (c == '=')
 			{
 				ni = parse_op(tk, ni, TK_EQUAL);
-				c = *str++;
+				c = str[si++];
 			}
 			else
 				ni = parse_op(tk, ni, TK_ASSIGN);
 			prefix = true;
 			break;
 		case '<':
-			c = *str++;
+			c = str[si++];
 			if (c == '=')
 			{
 				ni = parse_op(tk, ni, TK_LESS_EQUAL);
-				c = *str++;
+				c = str[si++];
 			}
 			else if (c == '<')
 			{
 				ni = parse_op(tk, ni, TK_SHL);
-				c = *str++;
+				c = str[si++];
 			}
 			else
 				ni = parse_op(tk, ni, TK_LESS_THAN);
 			prefix = true;
 			break;
 		case '>':
-			c = *str++;
+			c = str[si++];
 			if (c == '=')
 			{
 				ni = parse_op(tk, ni, TK_GREATER_EQUAL);
-				c = *str++;
+				c = str[si++];
 			}
 			else if (c == '>')
 			{
 				ni = parse_op(tk, ni, TK_SHR);
-				c = *str++;
+				c = str[si++];
 			}
 			else
 				ni = parse_op(tk, ni, TK_GREATER_THAN);
@@ -291,7 +303,7 @@ char * parse_expression(const char * str, char * tk)
 				if (!prefix)
 					return nullptr;
 
-				c = *str++;
+				c = str[si++];
 				char i = 0;
 				while (c != '"')
 				{
@@ -300,7 +312,7 @@ char * parse_expression(const char * str, char * tk)
 
 					if (c == '\\')
 					{
-						c = *str++;
+						c = str[si++];
 						if (c == p'n' || c == p'N')
 							c = 13;
 						else if (c == p't' || c == p'T')
@@ -309,9 +321,9 @@ char * parse_expression(const char * str, char * tk)
 
 					tk[ni + i + 2] = c;
 					i++;
-					c = *str++;
+					c = str[si++];
 				}
-				c = *str++;
+				c = str[si++];
 
 				tk[ni + 0] = TK_STRING;
 				tk[ni + 1] = i;
@@ -329,7 +341,7 @@ char * parse_expression(const char * str, char * tk)
 				do 	{
 					if (j < 8)
 						idbuf[j++] = c;
-					c = *str++;
+					c = str[si++];
 				} while (is_exletter(c));
 				idbuf[j] = 0;
 
@@ -343,43 +355,33 @@ char * parse_expression(const char * str, char * tk)
 				if (!prefix)
 					return nullptr;
 
-				unsigned long num = 0;
-				do {
-					num = num * 10 + (c - '0');
-					c = *str++;
-				} while (is_digit(c));
-				if (c == '.')
+				long lr;
+				si += number_parse(str + si - 1, 240, lr) - 1;
+				c = str[si++];
+
+				unsigned long num = lr;
+				if (num & 0xffff)
 				{
 					tk[ni++] = TK_NUMBER;
-					tk[ni++] = num >> 8;
-					tk[ni++] = num & 0xff;
-					num = 0;
-					unsigned long rem = 1;
-					c = *str++;
-					while (is_digit(c))
-					{
-						rem *= 10;
-						num = num * 10 + (c - '0');
-						c = *str++;
-					} 
-					num = ((num << 16) + (rem - 1)) / rem;
+					tk[ni++] = num >> 24;
+					tk[ni++] = num >> 16;
 					tk[ni++] = num >> 8;
 					tk[ni++] = num & 0xff;
 				}
-				else if (num < 16)
+				else if (num < 0x00100000ul)
 				{
-					tk[ni++] = TK_TINY_INT | num;
+					tk[ni++] = TK_TINY_INT | (num >> 16);
 				}
-				else if (num < 4096)
+				else if (num < 0x10000000ul)
 				{
-					tk[ni++] = TK_SMALL_INT | (num >> 8);
-					tk[ni++] = num & 0xff;
+					tk[ni++] = TK_SMALL_INT | (num >> 24);
+					tk[ni++] = num >> 16;
 				}
 				else
 				{
 					tk[ni++] = TK_NUMBER;
-					tk[ni++] = num >> 8;
-					tk[ni++] = num & 0xff;
+					tk[ni++] = num >> 24;
+					tk[ni++] = num >> 16;
 					tk[ni++] = 0;
 					tk[ni++] = 0;
 				}
@@ -425,6 +427,7 @@ char * parse_statement(const char * str, char * tk)
 
 	str += l;
 	char i = 0;
+
 	char	idbuf[10];
 	while (i < 10 && is_letter(str[i]))
 	{
@@ -483,6 +486,18 @@ char * parse_statement(const char * str, char * tk)
 		*tk++ = 0;
 		*tk++ = 0;
 		tk = parse_params(str + i, tk);
+	}
+	else if (str[i] == '#')
+	{
+		*tk++ = STMT_COMMENT;
+		i++;
+		while (str[i])
+		{
+			tk[i] = str[i];
+			i++;
+		}
+		tk[0] = i - 1;
+		return tk + i;
 	}
 	else
 	{

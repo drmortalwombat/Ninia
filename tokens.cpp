@@ -1,5 +1,11 @@
 #include "tokens.h"
+#include <fixmath.h>
 
+
+static inline unsigned long lmul10(unsigned long l)
+{
+	return (l + 4 * l) * 2;
+}
 
 const char * number_format(unsigned long l, bool sign)
 {
@@ -10,6 +16,9 @@ const char * number_format(unsigned long l, bool sign)
 	else
 		sign = false;
 	
+	// rounding 0.00005
+	l += 3;
+
 	char		si = 6;	
 	unsigned	hi = l >> 16;
 	if (hi == 0)
@@ -30,12 +39,13 @@ const char * number_format(unsigned long l, bool sign)
 	char ei = 6;
 
 	l &= 0xffff;
-	if (l)
+	if (l > 5)
 	{
 		buffer[ei++] = '.';
 		for(char i=0; i<4; i++)
 		{
-			l *= 10;
+			l = lmul10(l);
+			//l *= 10;
 			buffer[ei++] = char(l >> 16) + '0';
 			l &= 0xfffful;
 		}
@@ -64,8 +74,18 @@ bool is_digit(char c)
 	return c >= '0' && c <= '9';
 }
 
+unsigned long fscale[8] = {
+	858993459,
+	85899345,
+	8589934,
+	858993,	
+	85899,
+	8589,
+	858,
+	85,
+};
 
-unsigned long number_parse(const char * str, char n)
+char number_parse(const char * str, char n, long & lr)
 {
 	char 	i = 0;
 	bool	sign = false;
@@ -86,27 +106,28 @@ unsigned long number_parse(const char * str, char n)
 		i++;
 	}
 
-	unsigned long ul = (unsigned long)num << 16;
+	lr = (long)num << 16;
 	if (i < n && str[i] == '.')
 	{
 
 		unsigned long fract = 0;
-		unsigned long rem = 1;
 		i++;
 
+		char k = 0;
 		while (i < n && is_digit(str[i]))
 		{
-			rem *= 10;
-			fract = fract * 10 + (str[i] - '0');
+			k++;
+			fract = lmul10(fract) + (str[i] - '0');
 			i++;
 		} 
-		ul += ((fract << 16) + (rem - 1)) / rem;
+		if (k > 0)
+			lr += (unsigned long)(lmul16f16s(fract, fscale[k - 1]) + 1) >> 1;
 	}
 
 	if (sign)
-		return -(long)ul;
-	else
-		return ul;
+		lr = -lr;
+
+	return i;
 }
 
 char token_skip_expression(const char * tk)
@@ -192,6 +213,7 @@ char token_skip_statement(const char * tk)
 		case STMT_RETURN_NULL:
 			break;
 		case STMT_ERROR:
+		case STMT_COMMENT:
 			ti += tk[ti] + 1;
 			break;
 		}

@@ -1,0 +1,21 @@
+chrout(14)
+
+# Ein Kommentar
+
+print("Hello ")
+
+# Ein weiterer Kommentar
+
+print("World\n")
+
+# Ein letzter Kommentar
+
+WHILE (1)
+ print(chrin()," ")
+
+# Und fertig
+
+
+
+
+
