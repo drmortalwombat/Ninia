@@ -14,7 +14,7 @@ enum RuntimeError
 	NUM_ERRORS
 };
 
-extern const char * runtime_error_names[NUM_ERRORS];
+extern const char * const runtime_error_names[NUM_ERRORS];
 
 extern RuntimeError	runtime_error;
 

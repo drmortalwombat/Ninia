@@ -8,6 +8,8 @@
 #include "errors.h"
 
 #pragma bss( editbss )
+#pragma code( ecode )
+#pragma data( edata )
 
 char	buffer[200], cbuffer[200];
 char	ebuffer[200], ecbuffer[200];
@@ -34,7 +36,7 @@ unsigned screeny;
 
 void edit_init(void)
 {
-	starttk = (char *)0xe000;
+	starttk = (char *)0x1000;
 	endtk = starttk;
 	screentk = cursortk = starttk;
 	cursorx = 0;
@@ -44,7 +46,7 @@ void edit_init(void)
 	*endtk++ = 1;
 	*endtk++ = STMT_NONE;
 	*endtk++ = STMT_END;
-	limittk = (char *)0xfff0;
+	limittk = (char *)0x7000;
 }
 
 char * edit_screen_to_token(char y)
@@ -682,13 +684,13 @@ char edit_text(void)
 }
 
 
-bool edit_cmd(const char * name, char * cmd)
+bool edit_cmd(edit_cmd_t & ec)
 {
 	char * dp = Screen + 24 * 40;
 	char * ep = dp + 5;
 
 	for(char i=0; i<4; i++)
-		dp[i] = p2s(name[i]) | 0x80;
+		dp[i] = p2s(ec.name[i]) | 0x80;
 
 	dp[4] = s'[' | 0x80;
 	dp[17] = s']' | 0x80;
@@ -697,9 +699,9 @@ bool edit_cmd(const char * name, char * cmd)
 	for(;;)
 	{
 		char n = 0;
-		while (cmd[n])
+		while (ec.cmd[n])
 		{
-			ep[n] = p2s(cmd[n]) | 0x80;
+			ep[n] = p2s(ec.cmd[n]) | 0x80;
 			n++;
 		}
 		char i = n;
@@ -735,7 +737,7 @@ bool edit_cmd(const char * name, char * cmd)
 				char i = cx;
 				while (i < n)
 				{
-					cmd[i] = cmd[i+1];
+					ec.cmd[i] = ec.cmd[i+1];
 					i++;
 				}
 			}
@@ -751,12 +753,94 @@ bool edit_cmd(const char * name, char * cmd)
 				while (i > cx)
 				{
 					i--;
-					cmd[i + 1] = cmd[i];
+					ec.cmd[i + 1] = ec.cmd[i];
 				}
-				cmd[cx] = ch;
+				ec.cmd[cx] = ch;
 				cx++;
 			}
 			break;
 		}
 	}
 }
+
+bool tokens_load(const char * name)
+{
+	char	xname[32];
+	strcpy(xname, "0:");
+	strcat(xname, name);
+	strcat(xname, ".NIN,P,R");
+
+	krnio_setnam(xname);
+	if (krnio_open(2, 9, 2))
+	{				
+		edit_init();
+		krnio_chkin(2);
+
+		char * tk = starttk;
+		char status = krnio_status();
+		while (!status)
+		{
+			char i = 0;
+			while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
+			{
+				if (c >= 'A' && c <= 'Z')
+					c += p'A' - 'A';
+				else if (c >= 'a' && c <= 'z')
+					c -= 'a' - p'a';
+				if (c != 13)
+					buffer[i++] = c;
+			}
+			buffer[i] = 0;
+			tk = parse_statement(buffer, tk);
+		}
+		krnio_clrchn();
+		krnio_close(2);
+
+		*tk++ = STMT_END;
+		endtk = tk;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool tokens_save(const char * name)
+{
+	char	xname[32];
+	strcpy(xname, "@0:");
+	strcat(xname, name);
+	strcat(xname, ".NIN,P,W");
+
+	krnio_setnam(xname);
+	if (krnio_open(2, 9, 2))
+	{				
+		krnio_chkout(2);
+
+		const char * tk = starttk;
+		while (*tk)
+		{
+			tk = format_statement(tk, buffer, cbuffer);
+
+			char i =0 ;
+			while (char c = buffer[i])
+			{
+				if (c >= p'A' && c <= p'Z')
+					c -= p'A' - 'A';
+				else if (c >= p'a' && c <= p'z')
+					c += 'a' - p'a';
+				krnio_chrout(c);
+				i++;
+			}
+			krnio_chrout(10);
+		}
+
+		krnio_clrchn();
+		krnio_close(2);
+
+		return true;
+	}
+
+	return false;
+}
+

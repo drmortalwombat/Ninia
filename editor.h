@@ -1,5 +1,7 @@
 #pragma once
 
+#include "system.h"
+
 extern char * starttk, * limittk;
 
 extern char cursorx, cursory, screenx;
@@ -29,9 +31,18 @@ char * edit_line_to_token(unsigned y);
 
 char edit_line(void);
 
-char edit_text(void);
+__noinline char edit_text(void);
 
-bool edit_cmd(const char * name, char * cmd);
+struct edit_cmd_t
+{
+	char	name[4];
+	char	cmd[16];
+};
 
+__noinline bool edit_cmd(edit_cmd_t & ec);
+
+__noinline bool tokens_load(const char * name);
+
+__noinline bool tokens_save(const char * name);
 
 #pragma compile("editor.cpp")

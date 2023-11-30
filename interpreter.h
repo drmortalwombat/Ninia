@@ -5,16 +5,16 @@
 #define VALUE_STACK_SIZE	64
 #define CALL_STACK_SIZE		32
 
-void prepare_statements(char * tk);
+__noinline void prepare_statements(char * tk);
 
-void restore_statements(char * tk);
+__noinline void restore_statements(char * tk);
 
 extern __striped Value		estack[VALUE_STACK_SIZE];
 extern char				esp, efp;
 
 extern const char * exectk;
 
-bool interpret_statement(void);
+__noinline bool interpret_statement(void);
 
 #pragma compile("interpreter.cpp")
 

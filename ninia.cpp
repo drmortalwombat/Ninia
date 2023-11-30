@@ -14,98 +14,16 @@
 #include <c64/kernalio.h>
 #include <c64/memmap.h>
 
-void tokens_load(const char * name)
+edit_cmd_t	filename;
+
+#pragma code( mcode )
+
+void ninia_main(void)
 {
-	char	xname[32];
-	strcpy(xname, "0:");
-	strcat(xname, name);
-	strcat(xname, ".NIN,P,R");
-
-	mmap_set(MMAP_NO_BASIC);
-	krnio_setnam(xname);
-	if (krnio_open(2, 9, 2))
-	{				
-		edit_init();
-		krnio_chkin(2);
-
-		char * tk = starttk;
-		char status = krnio_status();
-		while (!status)
-		{
-			char i = 0;
-			while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
-			{
-				if (c >= 'A' && c <= 'Z')
-					c += p'A' - 'A';
-				else if (c >= 'a' && c <= 'z')
-					c -= 'a' - p'a';
-				if (c != 13)
-					buffer[i++] = c;
-			}
-			buffer[i] = 0;
-			mmap_set(MMAP_NO_ROM);
-			tk = parse_statement(buffer, tk);
-			mmap_set(MMAP_NO_BASIC);
-		}
-		krnio_clrchn();
-		krnio_close(2);
-
-		*tk++ = STMT_END;
-		endtk = tk;
-	}
-	mmap_set(MMAP_NO_ROM);				
-}
-
-void tokens_save(const char * name)
-{
-	char	xname[32];
-	strcpy(xname, "@0:");
-	strcat(xname, name);
-	strcat(xname, ".NIN,P,W");
-
-	mmap_set(MMAP_NO_BASIC);
-	krnio_setnam(xname);
-	if (krnio_open(2, 9, 2))
-	{				
-		krnio_chkout(2);
-		mmap_set(MMAP_NO_ROM);
-
-		const char * tk = starttk;
-		while (*tk)
-		{
-			tk = format_statement(tk, buffer, cbuffer);
-
-			mmap_set(MMAP_NO_BASIC);
-			char i =0 ;
-			while (char c = buffer[i])
-			{
-				if (c >= p'A' && c <= p'Z')
-					c -= p'A' - 'A';
-				else if (c >= p'a' && c <= p'z')
-					c += 'a' - p'a';
-				krnio_chrout(c);
-				i++;
-			}
-			krnio_chrout(10);
-			mmap_set(MMAP_NO_ROM);
-		}
-
-		mmap_set(MMAP_NO_BASIC);
-		krnio_clrchn();
-		krnio_close(2);
-	}
-	mmap_set(MMAP_NO_ROM);
-}
-
-char	filename[16];
-
-int main(void)
-{
-	system_init();
-
 	symbols_init();
 
-	edit_init();
+	system_call(edit_init, BANK_EDITOR, BANK_MAIN);
+
 #if 0
 	char * tk = starttk;
 
@@ -254,21 +172,24 @@ int main(void)
 
 	for(;;)
 	{
-		char ch = edit_text();
+		char ch = system_call(edit_text, BANK_EDITOR, BANK_MAIN);
+	
 		switch (ch)
 		{
 		case PETSCII_F5:
 			{
 				system_show_runtime();
-				parse_pretty(starttk);
-				prepare_statements(starttk);
-				while (interpret_statement() && !runtime_error && *(volatile char *)0x91 != 0x7f)
+				system_fcall<BANK_EDITOR, BANK_MAIN, parse_pretty, char *>(starttk);
+				system_fcall<BANK_RUNTIME, BANK_MAIN, prepare_statements, char *>(starttk);
+
+				while (system_vcall<BANK_RUNTIME, BANK_MAIN, interpret_statement>() && !runtime_error && *(volatile char *)0x91 != 0x7f)
 					;
-				restore_statements(starttk);
+				system_fcall<BANK_RUNTIME, BANK_MAIN, restore_statements, char *>(starttk);
+
 				if (runtime_error)
 				{
-					unsigned line = edit_token_to_line(exectk);
-					cursortk = edit_line_to_token(line);
+					unsigned line = system_tcall<BANK_EDITOR, BANK_MAIN, edit_token_to_line, const char *>(exectk);
+					cursortk = system_tcall<BANK_EDITOR, BANK_MAIN, edit_line_to_token, unsigned>(line);
 					if (line < screeny || line > screeny + 24)
 					{
 						screeny = line;
@@ -282,17 +203,17 @@ int main(void)
 				system_show_editor();
 			} break;
 		case PETSCII_F1:
-			if (edit_cmd(p"SAVE", filename))
+			memcpy(filename.name, p"SAVE", 4);
+			if (system_tcall<BANK_EDITOR, BANK_MAIN, edit_cmd, edit_cmd_t &>(filename))
 			{
-				tokens_save(filename);
+				system_tcall<BANK_EDITOR, BANK_MAIN, tokens_save, const char *>(filename.cmd);
 			} break;
 		case PETSCII_F2:
-			if (edit_cmd(p"LOAD", filename))
+			memcpy(filename.name, p"LOAD", 4);
+			if (system_tcall<BANK_EDITOR, BANK_MAIN, edit_cmd, edit_cmd_t &>(filename))
 			{
-				tokens_load(filename);
+				system_tcall<BANK_EDITOR, BANK_MAIN, tokens_load, const char *>(filename.cmd);
 			} break;
 		}
 	}
-
-	return 0;
 }

@@ -1,5 +1,9 @@
 #include "parser.h"
 #include "errors.h"
+#include "system.h"
+
+#pragma code( ecode )
+#pragma data( edata )
 
 char		ostack[32];
 char		osp;

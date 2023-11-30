@@ -8,6 +8,8 @@
 
 __zeropage char		esp;
 
+#pragma code( rcode )
+#pragma data( rdata )
 #pragma bss( rtbss )
 
 __striped Value		estack[VALUE_STACK_SIZE];

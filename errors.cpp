@@ -1,7 +1,8 @@
 #include "errors.h"
 
+#pragma code( ecode )
 
-const char * runtime_error_names[NUM_ERRORS] =
+const char * const runtime_error_names[NUM_ERRORS] =
 {
 	p"Ok",
 	p"Syntax error",

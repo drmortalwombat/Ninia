@@ -1,7 +1,10 @@
 #include "runtime.h"
+#include "editor.h"
 #include "interpreter.h"
 #include "errors.h"
 
+#pragma code( rcode )
+#pragma data( rdata )
 #pragma bss( rtbss )
 
 __striped Value			globals[256];
@@ -30,13 +33,14 @@ unsigned global_add(unsigned symbol)
 }
 
 
-unsigned mem_end;
+unsigned	mem_end;
+unsigned	mem_start;
 
-static const unsigned mem_start = 0xa000;
-static const unsigned mem_final = 0xc000;
+static const unsigned mem_final = 0x7000;
 
 void mem_init(void)
 {
+	mem_start = (unsigned)endtk;
 	mem_end = mem_start;
 }
 

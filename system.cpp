@@ -2,14 +2,67 @@
 #include <string.h>
 #include <c64/memmap.h>
 #include <c64/vic.h>
+#include <c64/easyflash.h>
+
+#pragma stacksize( 1024 )
+#pragma heapsize( 0 )
+
+
+#pragma section( bcode, 0 )
+#pragma region( brom, 0x8080, 0x80a0, , 0, { bcode } )
+
+#pragma section( bvector, 0 )
+#pragma region( bvector, 0xbffc, 0xbffe, , 0, { bvector } )
+
+#pragma data ( bvector )
+
+#pragma data ( bvector )
+
+__export const unsigned bvector[1] = {0x8080};
+
+#pragma code ( bcode )
+
+__export void bcode(void)
+{
+	__asm
+	{
+		lda #$87
+		sta $de02
+		jmp ($fffc)
+	}
+}
+
+#pragma code( mcode )
+#pragma data( mdata )
+
+void kernal_init(void)
+{
+	__asm
+	{
+		jsr	$fda3
+		jsr	$fd50
+		jsr	$fd15
+		jsr	$ff5b
+		cli
+	}
+}
+
+void ninia_main(void);
+
+
+int main(void)
+{
+	mmap_set(MMAP_ROM);
+
+	kernal_init();
+	mmap_trampoline();
+
+	ninia_main();
+
+	return 0;
+}
 
 static char * const Font = (char *)0xd000;
-
-void system_init(void)
-{
-	mmap_trampoline();
-	mmap_set(MMAP_NO_BASIC);
-}
 
 struct FontPatch
 {
@@ -83,7 +136,11 @@ static FontPatch fontpatch[] = {
 
 void system_show_editor(void)
 {
-	mmap_set(MMAP_CHAR_ROM);
+	__asm
+	{
+		sei
+	}
+	mmap_set(MMAP_ALL_ROM);
 	memcpy(Font, Font + 0x0800, 0x0800);
 	for(char i=0; i<6; i++)
 	{
@@ -97,7 +154,11 @@ void system_show_editor(void)
 			dp1[j] = ~sp[j];
 		}
 	}
-	mmap_set(MMAP_NO_ROM);
+	mmap_set(MMAP_ROM);
+	__asm
+	{
+		cli
+	}
 
 	vic_setmode(VICM_TEXT, Screen, Font);
 
@@ -113,9 +174,26 @@ void system_show_runtime(void)
 	vic.color_border = VCOL_LT_BLUE;
 	vic.color_back = VCOL_BLUE;
 
-	mmap_set(MMAP_NO_BASIC);
 	clrscr();
-	mmap_set(MMAP_NO_ROM);
+}
+
+#pragma code( code )
+#pragma data( data )
+
+
+__noinline void system_call(void (* fn)(void), char bank, char back)
+{
+	eflash.bank = bank;
+	fn();
+	eflash.bank = back;
+}
+
+__noinline char system_call(char (* fn)(void), char bank, char back)
+{
+	eflash.bank = bank;
+	char r = fn();
+	eflash.bank = back;
+	return r;
 }
 
 void system_putch(char ch)
@@ -123,11 +201,7 @@ void system_putch(char ch)
 	__asm
 	{
 		lda ch
-		ldx #MMAP_NO_BASIC
-		stx $01
 		jsr $ffd2
-		ldx #MMAP_NO_ROM
-		stx $01
 	}
 }
 
@@ -135,12 +209,7 @@ char system_readch(void)
 {	
 	__asm
 	{
-		ldx #MMAP_NO_BASIC
-		stx $01
-	l1:
 		jsr $ffcf
-		ldx #MMAP_NO_ROM
-		stx $01
 		sta accu
 	}
 }
@@ -149,13 +218,9 @@ char system_getch(void)
 {	
 	__asm
 	{
-		ldx #MMAP_NO_BASIC
-		stx $01
 	l1:
 		jsr $ffe4
 		beq l1
-		ldx #MMAP_NO_ROM
-		stx $01
 		sta accu
 	}
 }
@@ -164,11 +229,7 @@ char system_getchx(void)
 {	
 	__asm
 	{
-		ldx #MMAP_NO_BASIC
-		stx $01
 		jsr $ffe4
-		ldx #MMAP_NO_ROM
-		stx $01
 		sta accu
 	}
 }

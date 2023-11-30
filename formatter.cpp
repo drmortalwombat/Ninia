@@ -2,6 +2,9 @@
 #include "tokens.h"
 #include <c64/vic.h>
 
+#pragma code( ecode )
+#pragma data( edata )
+
 void format_insert(char * str, char * color, char si, char ei, char c)
 {
 	do {
@@ -343,7 +346,7 @@ const char * format_statement(const char * tk, char * str, char * col)
 				str[l] = '#';
 				col[l] = VCOL_PURPLE;
 				l++;
-				
+
 				char n = *tk++;
 				while (n)
 				{
