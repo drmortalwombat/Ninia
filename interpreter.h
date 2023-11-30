@@ -1,20 +1,29 @@
 #pragma once
 
+#include "system.h"
 #include "runtime.h"
 
 #define VALUE_STACK_SIZE	64
 #define CALL_STACK_SIZE		32
 
-__noinline void prepare_statements(char * tk);
+#define CSTACK_NONE		0
+#define CSTACK_WHILE	1
+#define CSTACK_FOR		2
+#define CSTACK_CALL		3
 
-__noinline void restore_statements(char * tk);
 
 extern __striped Value		estack[VALUE_STACK_SIZE];
 extern char				esp, efp;
 
 extern const char * exectk;
 
+#pragma code(rcode)
+
+__noinline void interpreter_init(char * tk);
+
 __noinline bool interpret_statement(void);
+
+#pragma code(code)
 
 #pragma compile("interpreter.cpp")
 

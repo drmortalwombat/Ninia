@@ -15,24 +15,6 @@ __striped unsigned		local_symbols[256];
 
 char					num_globals, num_local_symbols;
 
-unsigned global_find(unsigned symbol)
-{
-	char	vi = 0;
-	while (vi < num_globals && global_symbols[vi] != symbol)
-		vi++;
-	return vi;
-}
-
-unsigned global_add(unsigned symbol)
-{
-	global_symbols[num_globals] = symbol;
-
-	globals[num_globals].value = 0;
-	globals[num_globals].type = TYPE_NULL;
-	return num_globals++;
-}
-
-
 unsigned	mem_end;
 unsigned	mem_start;
 

@@ -181,21 +181,6 @@ void system_show_runtime(void)
 #pragma data( data )
 
 
-__noinline void system_call(void (* fn)(void), char bank, char back)
-{
-	eflash.bank = bank;
-	fn();
-	eflash.bank = back;
-}
-
-__noinline char system_call(char (* fn)(void), char bank, char back)
-{
-	eflash.bank = bank;
-	char r = fn();
-	eflash.bank = back;
-	return r;
-}
-
 void system_putch(char ch)
 {
 	__asm

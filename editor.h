@@ -10,7 +10,7 @@ extern unsigned screeny;
 
 extern char	buffer[200], cbuffer[200];
 
-void edit_init(void);
+#pragma code(ecode)
 
 const char * edit_display_line(char y, const char * tk);
 
@@ -22,16 +22,13 @@ void edit_scroll_up(void);
 
 void edit_scroll_down(void);
 
-char * edit_screen_to_token(char y);
+__noinline char * edit_screen_to_token(char y);
 
-unsigned edit_token_to_line(const char * c);
+__noinline unsigned edit_token_to_line(const char * c);
 
-char * edit_line_to_token(unsigned y);
-
+__noinline char * edit_line_to_token(unsigned y);
 
 char edit_line(void);
-
-__noinline char edit_text(void);
 
 struct edit_cmd_t
 {
@@ -39,10 +36,16 @@ struct edit_cmd_t
 	char	cmd[16];
 };
 
+__noinline void edit_init(void);
+
+__noinline char edit_text(void);
+
 __noinline bool edit_cmd(edit_cmd_t & ec);
 
 __noinline bool tokens_load(const char * name);
 
 __noinline bool tokens_save(const char * name);
+
+#pragma code(code)
 
 #pragma compile("editor.cpp")

@@ -9,10 +9,6 @@ extern __striped unsigned			local_symbols[256];
 
 extern char	num_globals, num_local_symbols;
 
-unsigned global_find(unsigned symbol);
-
-unsigned global_add(unsigned symbol);
-
 struct MemHead
 {
 	char		type;
