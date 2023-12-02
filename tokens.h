@@ -126,10 +126,6 @@ struct Value
 	long	value;
 };
 
-char token_skip_expression(const char * tk);
-
-char token_skip_statement(const char * tk);
-
 bool is_letter(char c);
 
 bool is_exletter(char c);

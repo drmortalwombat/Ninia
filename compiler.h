@@ -8,13 +8,18 @@ __noinline void prepare_statements(char * tk);
 
 __noinline void restore_statements(char * tk);
 
-#pragma code(code)
+__noinline char token_skip_statement(const char * tk);
 
-#pragma code(ecode)
+__noinline char * edit_screen_to_token(char y);
 
-char token_skip_expression(const char * tk);
+__noinline unsigned edit_token_to_line(const char * c);
 
-char token_skip_statement(const char * tk);
+__noinline char * edit_line_to_token(unsigned y);
+
+__noinline bool tokens_load(const char * name);
+
+__noinline bool tokens_save(const char * name);
+
 
 #pragma code(code)
 

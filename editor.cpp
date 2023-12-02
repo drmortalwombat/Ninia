@@ -6,6 +6,7 @@
 #include <conio.h>
 #include "tokens.h"
 #include "errors.h"
+#include "compiler.h"
 
 #pragma bss( editbss )
 #pragma code( ecode )
@@ -49,40 +50,11 @@ void edit_init(void)
 	limittk = (char *)0x7000;
 }
 
-char * edit_screen_to_token(char y)
-{
-	char * tk = screentk;
-	for(char i=0; i<y; i++)
-		tk += token_skip_statement(tk);
-	return tk;
-}
-
-unsigned edit_token_to_line(const char * ct)
-{
-	char * tk = starttk;
-	unsigned line = 0;
-	while (*tk && tk <= ct)
-	{
-		tk += token_skip_statement(tk);
-		line++;
-	}
-
-	return line - 1;
-}
-
-char * edit_line_to_token(unsigned y)
-{
-	char * tk = starttk;
-	for(unsigned i=0; i<y; i++)
-		tk += token_skip_statement(tk);
-	return tk;
-}
-
 const char * edit_display_line(char y, const char * tk)
 {
 	char mark = (marktk && tk >= marktk && tk < cursortk) ? 0x80 : 0x00;
 
-	tk = format_statement(tk, buffer, cbuffer);
+	tk = SYS_RPCALL3(format_statement, tk, buffer, cbuffer);
 
 	char i = 0;
 	while (i < screenx && buffer[i])
@@ -154,7 +126,7 @@ void scroll_right(void)
 void edit_scroll_up(void)
 {
 	screeny++;
-	screentk += token_skip_statement(screentk);
+	screentk += SYS_RPCALL(token_skip_statement, screentk);
 
 	char * dp = Screen;
 	char * cp = Color;
@@ -170,13 +142,13 @@ void edit_scroll_up(void)
 		cp += 40;
 	}
 
-	edit_display_line(23, edit_screen_to_token(23));
+	edit_display_line(23, SYS_RPCALL(edit_screen_to_token, 23));
 }
 
 void edit_scroll_down(void)
 {
 	screeny--;
-	screentk = edit_line_to_token(screeny);
+	screentk = SYS_RPCALL(edit_line_to_token, screeny);
 
 	char * dp = Screen + 23 * 40;
 	char * cp = Color + 23 * 40;
@@ -205,7 +177,7 @@ char edit_length(void)
 
 char edit_line(void)
 {
-	int psz = format_statement(cursortk, ebuffer, ecbuffer) - cursortk;
+	int psz = SYS_RPCALL3(format_statement, cursortk, ebuffer, ecbuffer) - cursortk;
 
 	char i = 0;
 	while (ebuffer[i])
@@ -334,7 +306,7 @@ char edit_line(void)
 				i = edit_length();
 				ebuffer[i] = 0;
 
-				int nsz = parse_statement(ebuffer, buffer) - buffer;
+				int nsz = SYS_RPCALL2(parse_statement, (char *)ebuffer, (char *)buffer) - buffer;
 
 				if (ch == PETSCII_RETURN)
 				{
@@ -435,7 +407,7 @@ char edit_line(void)
 			if (upy != cursory)
 				uptk = edit_display_line(upy, uptk);
 			else
-				uptk += token_skip_statement(uptk);
+				uptk += SYS_RPCALL(token_skip_statement, uptk);
 			upy++;
 		}
 	}
@@ -546,11 +518,11 @@ char edit_text(void)
 				char i = 0;
 				while (i < cursory)
 				{
-					prevtk += token_skip_statement(prevtk);
+					prevtk += SYS_RPCALL(token_skip_statement, prevtk);
 					i++;
 				}
 
-				if (token_skip_statement(prevtk) == 2)
+				if (SYS_RPCALL(token_skip_statement, prevtk) == 2)
 				{
 					// delete previous line
 					memmove(prevtk, cursortk, endtk - cursortk);
@@ -558,7 +530,7 @@ char edit_text(void)
 					cursortk = prevtk;
 					edit_refresh_screen();									
 				}
-				else if (token_skip_statement(cursortk) == 2)
+				else if (SYS_RPCALL(token_skip_statement, cursortk) == 2)
 				{
 					// delete current line
 					memmove(cursortk, cursortk + 2, endtk - cursortk - 2);
@@ -575,7 +547,7 @@ char edit_text(void)
 			if (*cursortk)
 			{
 				cursory++;
-				cursortk += token_skip_statement(cursortk);
+				cursortk += SYS_RPCALL(token_skip_statement, cursortk);
 				cursorx = *cursortk - 1;
 			}
 			break;
@@ -584,7 +556,7 @@ char edit_text(void)
 			{
 				marktk = nullptr;
 
-				char len = token_skip_statement(cursortk);
+				char len = SYS_RPCALL(token_skip_statement, cursortk);
 				char * nexttk = cursortk + len;
 				memmove(cursortk, nexttk, endtk - nexttk);
 				endtk -= len;
@@ -603,7 +575,7 @@ char edit_text(void)
 				cursortk = marktk;
 				marktk = nullptr;
 
-				unsigned	line = edit_token_to_line(cursortk);
+				unsigned	line = SYS_RPCALL(edit_token_to_line, cursortk);
 				if (line < screeny || line > screeny + 24)
 				{
 					screeny = line;
@@ -624,7 +596,7 @@ char edit_text(void)
 				memcpy(marktk, blocktk, sz);
 				endtk += sz;
 
-				unsigned	line = edit_token_to_line(cursortk);
+				unsigned	line = SYS_RPCALL(edit_token_to_line, cursortk);
 				if (line < screeny || line > screeny + 24)
 				{
 					screeny = line;
@@ -678,8 +650,7 @@ char edit_text(void)
 
 		cursortk = screentk;
 		for(char i=0; i<cursory; i++)
-			cursortk += token_skip_statement(cursortk);
-
+			cursortk += SYS_RPCALL(token_skip_statement, cursortk);
 	}	
 }
 
@@ -761,86 +732,5 @@ bool edit_cmd(edit_cmd_t & ec)
 			break;
 		}
 	}
-}
-
-bool tokens_load(const char * name)
-{
-	char	xname[32];
-	strcpy(xname, "0:");
-	strcat(xname, name);
-	strcat(xname, ".NIN,P,R");
-
-	krnio_setnam(xname);
-	if (krnio_open(2, 9, 2))
-	{				
-		edit_init();
-		krnio_chkin(2);
-
-		char * tk = starttk;
-		char status = krnio_status();
-		while (!status)
-		{
-			char i = 0;
-			while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
-			{
-				if (c >= 'A' && c <= 'Z')
-					c += p'A' - 'A';
-				else if (c >= 'a' && c <= 'z')
-					c -= 'a' - p'a';
-				if (c != 13)
-					buffer[i++] = c;
-			}
-			buffer[i] = 0;
-			tk = parse_statement(buffer, tk);
-		}
-		krnio_clrchn();
-		krnio_close(2);
-
-		*tk++ = STMT_END;
-		endtk = tk;
-
-		return true;
-	}
-
-	return false;
-}
-
-bool tokens_save(const char * name)
-{
-	char	xname[32];
-	strcpy(xname, "@0:");
-	strcat(xname, name);
-	strcat(xname, ".NIN,P,W");
-
-	krnio_setnam(xname);
-	if (krnio_open(2, 9, 2))
-	{				
-		krnio_chkout(2);
-
-		const char * tk = starttk;
-		while (*tk)
-		{
-			tk = format_statement(tk, buffer, cbuffer);
-
-			char i =0 ;
-			while (char c = buffer[i])
-			{
-				if (c >= p'A' && c <= p'Z')
-					c -= p'A' - 'A';
-				else if (c >= p'a' && c <= p'z')
-					c += 'a' - p'a';
-				krnio_chrout(c);
-				i++;
-			}
-			krnio_chrout(10);
-		}
-
-		krnio_clrchn();
-		krnio_close(2);
-
-		return true;
-	}
-
-	return false;
 }
 

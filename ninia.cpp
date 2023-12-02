@@ -38,19 +38,19 @@ void ninia_main(void)
 		case PETSCII_F5:
 			{
 				system_show_runtime();
-				SYS_VPCALL(parse_pretty, char *, starttk);
-				SYS_VPCALL(prepare_statements, char *, starttk);
+				SYS_VPCALL(parse_pretty, starttk);
+				SYS_VPCALL(prepare_statements, starttk);
 
-				SYS_VPCALL(interpreter_init, char *, starttk);
+				SYS_VPCALL(interpreter_init, starttk);
 
 				while (SYS_RCALL(interpret_statement) && !runtime_error && *(volatile char *)0x91 != 0x7f)
 					;
-				SYS_VPCALL(restore_statements, char *, starttk);
+				SYS_VPCALL(restore_statements, starttk);
 
 				if (runtime_error)
 				{
-					unsigned line = SYS_RPCALL(edit_token_to_line, const char *, exectk);
-					cursortk = SYS_RPCALL(edit_line_to_token, unsigned, line);
+					unsigned line = SYS_RPCALL(edit_token_to_line, exectk);
+					cursortk = SYS_RPCALL(edit_line_to_token, line);
 					if (line < screeny || line > screeny + 24)
 					{
 						screeny = line;
@@ -65,15 +65,15 @@ void ninia_main(void)
 			} break;
 		case PETSCII_F1:
 			memcpy(filename.name, p"SAVE", 4);
-			if (SYS_RPCALL(edit_cmd, edit_cmd_t &, filename))
+			if (SYS_RRCALL(edit_cmd, filename))
 			{
-				SYS_RPCALL(tokens_save, const char *, filename.cmd);
+				SYS_RPCALL(tokens_save, filename.cmd);
 			} break;
 		case PETSCII_F2:
 			memcpy(filename.name, p"LOAD", 4);
-			if (SYS_RPCALL(edit_cmd, edit_cmd_t &, filename))
+			if (SYS_RRCALL(edit_cmd, filename))
 			{
-				SYS_RPCALL(tokens_load, const char *, filename.cmd);
+				SYS_RPCALL(tokens_load, filename.cmd);
 			} break;
 		}
 	}

@@ -3,7 +3,7 @@
 #include "system.h"
 #include "tokens.h"
 
-#pragma code(ecode)
+#pragma code(tcode)
 
 char * parse_statement(const char * str, char * tk);
 

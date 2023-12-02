@@ -22,12 +22,6 @@ void edit_scroll_up(void);
 
 void edit_scroll_down(void);
 
-__noinline char * edit_screen_to_token(char y);
-
-__noinline unsigned edit_token_to_line(const char * c);
-
-__noinline char * edit_line_to_token(unsigned y);
-
 char edit_line(void);
 
 struct edit_cmd_t

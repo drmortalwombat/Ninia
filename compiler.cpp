@@ -423,8 +423,6 @@ void restore_statements(char * tk)
 	}	
 }
 
-#pragma code(ecode)
-
 char token_skip_expression(const char * tk)
 {
 	char	ti = 0;
@@ -517,5 +515,115 @@ char token_skip_statement(const char * tk)
 	return ti;	
 }
 
+char * edit_screen_to_token(char y)
+{
+	char * tk = screentk;
+	for(char i=0; i<y; i++)
+		tk += token_skip_statement(tk);
+	return tk;
+}
 
+unsigned edit_token_to_line(const char * ct)
+{
+	char * tk = starttk;
+	unsigned line = 0;
+	while (*tk && tk <= ct)
+	{
+		tk += token_skip_statement(tk);
+		line++;
+	}
+
+	return line - 1;
+}
+
+char * edit_line_to_token(unsigned y)
+{
+	char * tk = starttk;
+	for(unsigned i=0; i<y; i++)
+		tk += token_skip_statement(tk);
+	return tk;
+}
+
+
+
+bool tokens_load(const char * name)
+{
+	char	xname[32];
+	strcpy(xname, "0:");
+	strcat(xname, name);
+	strcat(xname, ".NIN,P,R");
+
+	krnio_setnam(xname);
+	if (krnio_open(2, 9, 2))
+	{				
+		edit_init();
+		krnio_chkin(2);
+
+		char * tk = starttk;
+		char status = krnio_status();
+		while (!status)
+		{
+			char i = 0;
+			while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
+			{
+				if (c >= 'A' && c <= 'Z')
+					c += p'A' - 'A';
+				else if (c >= 'a' && c <= 'z')
+					c -= 'a' - p'a';
+				if (c != 13)
+					buffer[i++] = c;
+			}
+			buffer[i] = 0;
+			tk = parse_statement((char *)buffer, tk);
+		}
+		krnio_clrchn();
+		krnio_close(2);
+
+		*tk++ = STMT_END;
+		endtk = tk;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool tokens_save(const char * name)
+{
+	char	xname[32];
+	strcpy(xname, "@0:");
+	strcat(xname, name);
+	strcat(xname, ".NIN,P,W");
+
+	krnio_setnam(xname);
+	if (krnio_open(2, 9, 2))
+	{				
+		krnio_chkout(2);
+
+		const char * tk = starttk;
+		while (*tk)
+		{
+			tk = format_statement(tk, buffer, cbuffer);
+
+			char i =0 ;
+			while (char c = buffer[i])
+			{
+				if (c >= p'A' && c <= p'Z')
+					c -= p'A' - 'A';
+				else if (c >= p'a' && c <= p'z')
+					c += 'a' - p'a';
+				krnio_chrout(c);
+				i++;
+			}
+			krnio_chrout(10);
+		}
+
+		krnio_clrchn();
+		krnio_close(2);
+
+		return true;
+	}
+
+	return false;
+}
 

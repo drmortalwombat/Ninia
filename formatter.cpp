@@ -2,8 +2,8 @@
 #include "tokens.h"
 #include <c64/vic.h>
 
-#pragma code( ecode )
-#pragma data( edata )
+#pragma code( tcode )
+#pragma data( tdata )
 
 void format_insert(char * str, char * color, char si, char ei, char c)
 {

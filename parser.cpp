@@ -2,8 +2,8 @@
 #include "errors.h"
 #include "system.h"
 
-#pragma code( ecode )
-#pragma data( edata )
+#pragma code( tcode )
+#pragma data( tdata )
 
 char		ostack[32];
 char		osp;

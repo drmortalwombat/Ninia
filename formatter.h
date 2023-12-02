@@ -1,6 +1,6 @@
 #pragma once
 
-#pragma code(ecode)
+#pragma code(tcode)
 
 const char * format_statement(const char * tk, char * str, char * col);
 

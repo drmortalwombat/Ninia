@@ -68,8 +68,8 @@ __noinline auto system_rcall(void)
 	return r;
 }
 
-template<int back, class fn, class T>
-__noinline auto system_rpcall(T t)
+template<int back, class fn>
+__noinline auto system_rpcall(auto t)
 {
 	eflash.bank = __bankof(fn);
 	auto r = fn(t);
@@ -77,8 +77,35 @@ __noinline auto system_rpcall(T t)
 	return r;
 }
 
-template<int back, class fn, class T>
-__noinline void system_vpcall(T t)
+template<int back, class fn>
+__noinline auto system_rpcall2(auto t, auto u)
+{
+	eflash.bank = __bankof(fn);
+	auto r = fn(t, u);
+	eflash.bank = back;
+	return r;
+}
+
+template<int back, class fn>
+__noinline auto system_rpcall3(auto t, auto u, auto v)
+{
+	eflash.bank = __bankof(fn);
+	auto r = fn(t, u, v);
+	eflash.bank = back;
+	return r;
+}
+
+template<int back, class fn>
+__noinline auto system_rrcall(auto & t)
+{
+	eflash.bank = __bankof(fn);
+	auto r = fn(t);
+	eflash.bank = back;
+	return r;
+}
+
+template<int back, class fn>
+__noinline void system_vpcall(auto t)
 {
 	eflash.bank = __bankof(fn);
 	fn(t);
@@ -89,9 +116,15 @@ __noinline void system_vpcall(T t)
 
 #define SYS_RCALL(fn) system_rcall<__bankof(""), fn>()
 
-#define SYS_VPCALL(fn, T, t) system_vpcall<__bankof(""), fn, T>(t)
+#define SYS_VPCALL(fn, t) system_vpcall<__bankof(""), fn>(t)
 
-#define SYS_RPCALL(fn, T, t) system_rpcall<__bankof(""), fn, T>(t)
+#define SYS_RPCALL(fn, t) system_rpcall<__bankof(""), fn>(t)
+
+#define SYS_RPCALL2(fn, t, u) system_rpcall2<__bankof(""), fn>(t, u)
+
+#define SYS_RPCALL3(fn, t, u, v) system_rpcall3<__bankof(""), fn>(t, u, v)
+
+#define SYS_RRCALL(fn, t) system_rrcall<__bankof(""), fn>(t)
 
 
 #pragma compile("system.cpp")
