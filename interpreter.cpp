@@ -749,6 +749,8 @@ void interpret_binop(char t)
 	case TK_OR:
 		l1 = (unsigned long)((unsigned)(l1 >> 16) | (unsigned)(l2 >> 16)) << 16;
 		break;
+	default:
+		__assume(false);
 	}
 }
 
@@ -889,6 +891,8 @@ bool interpret_expression(void)
 						valpush(TYPE_NUMBER, 0);
 					}
 				}	break;
+			default:
+				__assume(false);
 			}
 			break;
 
@@ -925,9 +929,8 @@ bool interpret_expression(void)
 						}
 					}
 					else
-						runtime_error = RERR_INVALID_TYPES;
-					break;
-				}
+						runtime_error = RERR_INVALID_TYPES;					
+				}	break;
 			case TK_INVOKE:
 				{
 					char n = tk[ti++];
@@ -965,8 +968,7 @@ bool interpret_expression(void)
 						}
 					}
 				}	break;
-			}
-			break;
+			}	break;
 
 		case TK_ASSIGN:
 			{
@@ -982,6 +984,8 @@ bool interpret_expression(void)
 				case TK_ASSIGN_SUB:
 					valinc(-valpop());
 					break;
+				default:
+					__assume(false);
 				}
 			}	break;
 
@@ -1056,8 +1060,12 @@ bool interpret_expression(void)
 						ti += 2 * n + 1;
 						valpush(TYPE_STRUCT, (unsigned)md);
 					} break;
+				default:
+					__assume(false);
 				}
-			}
+			} break;
+		default:
+			__assume(false);
 		}
 	}
 }
@@ -1194,7 +1202,16 @@ bool interpret_statement(void)
 				exectk = tk;
 				return true;
 			}
+
+		default:
+			__assume(false);
 		}
 	}
 }
 	
+void interpret_program(void)
+{
+	while (interpret_statement() && !runtime_error && *(volatile char *)0x91 != 0x7f)
+		;
+}
+

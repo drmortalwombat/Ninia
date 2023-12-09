@@ -36,10 +36,6 @@ __noinline char edit_text(void);
 
 __noinline bool edit_cmd(edit_cmd_t & ec);
 
-__noinline bool tokens_load(const char * name);
-
-__noinline bool tokens_save(const char * name);
-
 #pragma code(code)
 
 #pragma compile("editor.cpp")

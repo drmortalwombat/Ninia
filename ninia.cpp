@@ -43,8 +43,8 @@ void ninia_main(void)
 
 				SYS_VPCALL(interpreter_init, starttk);
 
-				while (SYS_RCALL(interpret_statement) && !runtime_error && *(volatile char *)0x91 != 0x7f)
-					;
+				SYS_VCALL(interpret_program);
+
 				SYS_VPCALL(restore_statements, starttk);
 
 				if (runtime_error)

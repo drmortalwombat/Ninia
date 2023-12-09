@@ -21,7 +21,7 @@ extern const char * exectk;
 
 __noinline void interpreter_init(char * tk);
 
-__noinline bool interpret_statement(void);
+__noinline void interpret_program(void);
 
 #pragma code(code)
 
