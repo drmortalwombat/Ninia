@@ -74,6 +74,12 @@ bool is_digit(char c)
 	return c >= '0' && c <= '9';
 }
 
+bool is_hex(char c)
+{
+	return c >= p'a' && c <= p'f' || c >= p'A' && c <= p'F' || c >= '0' && c <= '9';
+}
+
+
 unsigned long fscale[8] = {
 	858993459,
 	85899345,

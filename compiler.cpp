@@ -111,6 +111,7 @@ char * prepare_expression(char * tk, bool var)
 					left = true;
 					break;
 				case TK_STRING:
+				case TK_BYTES:
 					tk += tk[1] + 2;
 					left = false;
 					break;
@@ -314,6 +315,7 @@ char * restore_expression(char * tk, bool var)
 					left = true;
 					break;
 				case TK_STRING:
+				case TK_BYTES:
 					tk += tk[1] + 2;
 					left = false;
 					break;
@@ -454,6 +456,7 @@ char token_skip_expression(const char * tk)
 			switch (t)
 			{
 			case TK_STRING:
+			case TK_BYTES:
 				ti += tk[ti + 1] + 2;
 				break;
 			case TK_LIST:

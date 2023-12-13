@@ -123,6 +123,17 @@ char close_op(char * tk, char ni, bool prefix)
 	return ni;
 }
 
+char hex_value(char c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	else if (c >= 'a' && c <= 'f')
+		return c + 10 - 'a';
+	else if (c >= 'A' && c <= 'F')
+		return c + 10 - 'A';
+	else
+		return 0;
+}
 char * parse_expression(const char * str, char * tk)
 {
 	osp = 0;
@@ -338,7 +349,27 @@ char * parse_expression(const char * str, char * tk)
 				tk[ni + 1] = i;
 				ni += i + 2;
 				prefix = false;
-			} break;				
+			} break;
+		case '$':
+			{
+				if (!prefix)
+					return nullptr;
+
+				char i = 0;
+				c = str[si++];
+				while (is_hex(c) && is_hex(str[si]))
+				{
+					char d = str[si++];
+					tk[ni + i + 2] = (hex_value(c) << 4) | hex_value(d);
+					i++;
+					c = str[si++];
+				}
+
+				tk[ni + 0] = TK_BYTES;
+				tk[ni + 1] = i;
+				ni += i + 2;
+				prefix = false;
+			} break;
 		default:
 			if (is_letter(c))
 			{

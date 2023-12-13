@@ -78,6 +78,7 @@
 #define TK_LIST				(TK_CONTROL + 5)
 #define TK_ARRAY			(TK_CONTROL + 6)
 #define TK_STRUCT			(TK_CONTROL + 7)
+#define TK_BYTES			(TK_CONTROL + 8)
 
 #define STMT_END			0x00
 #define STMT_ERROR			0x01
@@ -132,6 +133,8 @@ bool is_letter(char c);
 bool is_exletter(char c);
 
 bool is_digit(char c);
+
+bool is_hex(char c);
 
 
 const char * number_format(unsigned long l, bool sign);

@@ -31,6 +31,16 @@ __striped unsigned		localvars[32];
 const char * exectk;
 char exect;
 
+unsigned useed;
+
+unsigned int urand(void)
+{
+    useed ^= useed << 7;
+    useed ^= useed >> 9;
+    useed ^= useed << 8;
+	return useed;
+}
+
 void interpreter_init(char * tk)
 {
 	exectk = tk;
@@ -39,6 +49,7 @@ void interpreter_init(char * tk)
 	cfp = 0;
 	runtime_error = 0;
 	callstack[0].type = CSTACK_NONE;
+	useed = clock() ^ 0x3417;
 	mem_init();
 }
 
@@ -364,7 +375,7 @@ void interpret_builtin(char n)
 		} break;		
 	case RTSYM_RAND:
 		esp += n + 1;
-		valpush(TYPE_NUMBER, rand());
+		valpush(TYPE_NUMBER, urand());
 		break;
 	case RTSYM_TIME:
 		{
@@ -1033,6 +1044,7 @@ bool interpret_expression(void)
 					estack[esp].value |= ei << 16;
 					break;
 				case TK_STRING:
+				case TK_BYTES:
 					valpush(TYPE_STRING_LITERAL, (unsigned)(tk + ti));
 					ti += tk[ti] + 1;
 					break;

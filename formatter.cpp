@@ -82,6 +82,8 @@ const char assign_names[][2] = {
 	"=", "+=", "-="
 };
 
+const char hex_chars[16] = "0123456789abcdef";
+
 const char * format_expression(const char * tk, char * str, char * color, char si)
 {
 	char		ti = 0;
@@ -272,8 +274,25 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 					color[si] = VCOL_MED_GREY;
 					si++;
 				} break;
-				case TK_LIST:
-				case TK_ARRAY:
+			case TK_BYTES:
+				{
+					stack[sp++] = si;
+					str[si] = '$';
+					color[si] = VCOL_MED_GREY;
+					si++;
+					char n = tk[ti++];
+					for(char i=0; i<n; i++)
+					{
+						char c = tk[ti++];
+						str[si] = hex_chars[c >> 4];
+						str[si+1] = hex_chars[c & 0x0f];
+						color[si] = color[si+1] = VCOL_LT_BLUE ^ 8 * (i & 1);
+
+						si += 2;
+					}
+				} break;
+			case TK_LIST:
+			case TK_ARRAY:
 				{
 					char n = tk[ti++];
 					while (n > 1)
@@ -296,36 +315,36 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 					si += 2;
 				}	break;
 
-				case TK_STRUCT:
+			case TK_STRUCT:
+			{
+				char n = tk[ti++];
+				if (n)
 				{
-					char n = tk[ti++];
-					if (n)
+					char i = n;
+					while (i > 0)
 					{
-						char i = n;
-						while (i > 0)
-						{
-							i--;
-							si += format_insert_sym(str, color, stack[--sp], si, i == 0 ? '{' : ',', (tk[ti + 2 * i + 1] << 8) | tk[ti + 2 * i]);
-						}
-						sp++;
+						i--;
+						si += format_insert_sym(str, color, stack[--sp], si, i == 0 ? '{' : ',', (tk[ti + 2 * i + 1] << 8) | tk[ti + 2 * i]);
 					}
-					else
-					{
-						stack[sp++] = si;
-						str[si] = '{';
-						color[si] = VCOL_MED_GREY;
-						si ++;
-					}
-					str[si] = '}';
+					sp++;
+				}
+				else
+				{
+					stack[sp++] = si;
+					str[si] = '{';
 					color[si] = VCOL_MED_GREY;
 					si ++;
-					ti += 2 * n;
-				} break;
+				}
+				str[si] = '}';
+				color[si] = VCOL_MED_GREY;
+				si ++;
+				ti += 2 * n;
+			} break;
 
-				case TK_END:
-					str[si] = 0;
-					return tk + ti;
-			}
+			case TK_END:
+				str[si] = 0;
+				return tk + ti;
+			} 
 			break;
 		}
 		t = tk[ti++];
