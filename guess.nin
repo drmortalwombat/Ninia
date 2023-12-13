@@ -1,0 +1,23 @@
+DEF getnum()
+ WHILE 1
+  print("Guess a number (1..6)?")
+  VAR guess=input()
+  print("\n")
+  IF guess=="q"
+   EXIT
+  guess=val(guess)
+  IF guess>=1&guess<=6
+   RETURN guess
+
+VAR num=floor(rand()*6)+1
+WHILE 1
+ VAR guess=getnum()
+ IF guess==num
+  print("You nailed it.\n\n")
+  num=floor(rand()*6)+1
+ ELSE
+  print("Not my number, try again.\n")
+
+
+
+

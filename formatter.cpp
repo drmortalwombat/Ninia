@@ -407,6 +407,10 @@ const char * format_statement(const char * tk, char * str, char * col)
 			l = format_append(str, col, l, VCOL_WHITE, p"BREAK");
 			str[l] = 0;
 			return tk;
+		case STMT_EXIT:
+			l = format_append(str, col, l, VCOL_WHITE, p"EXIT");
+			str[l] = 0;
+			return tk;
 		case STMT_RETURN_NULL:
 			l = format_append(str, col, l, VCOL_WHITE, p"RETURN");
 			str[l] = 0;

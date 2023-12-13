@@ -96,6 +96,7 @@
 #define STMT_RETURN			0x24
 #define STMT_RETURN_NULL	0x25
 #define STMT_BREAK			0x26
+#define STMT_EXIT			0x27
 
 
 #define TYPE_NUMBER			0x08

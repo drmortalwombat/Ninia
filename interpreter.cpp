@@ -1170,6 +1170,8 @@ bool interpret_statement(void)
 		}
 		runtime_error = RERR_INVALID_BREAK;
 		return true;
+	case STMT_EXIT:
+		return false;
 	case STMT_WHILE:
 	case STMT_IF:
 		tk += 4;
