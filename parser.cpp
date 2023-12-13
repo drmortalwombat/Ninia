@@ -504,6 +504,10 @@ char * parse_statement(const char * str, char * tk)
 		*tk++ = 0;
 		*tk++ = 0;
 	}
+	else if (!strcmp(idbuf, p"break"))
+	{
+		*tk++ = STMT_BREAK;
+	}
 	else if (!strcmp(idbuf, p"var"))
 	{
 		*tk++ = STMT_VAR;

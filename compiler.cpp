@@ -217,6 +217,7 @@ void prepare_statements(char * tk)
 				break;		
 			case STMT_RETURN_NULL:
 			case STMT_NONE:
+			case STMT_BREAK:
 				break;
 			case STMT_WHILE:
 			case STMT_IF:
@@ -398,6 +399,7 @@ void restore_statements(char * tk)
 				break;
 			case STMT_RETURN_NULL:
 			case STMT_NONE:
+			case STMT_BREAK:
 				break;
 			case STMT_WHILE:
 			case STMT_IF:
@@ -507,6 +509,7 @@ char token_skip_statement(const char * tk)
 			break;
 		case STMT_NONE:
 		case STMT_RETURN_NULL:
+		case STMT_BREAK:
 			break;
 		case STMT_ERROR:
 		case STMT_COMMENT:

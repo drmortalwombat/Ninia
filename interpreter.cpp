@@ -1153,6 +1153,23 @@ bool interpret_statement(void)
 	case STMT_DEF:
 		exectk = (char *)(etk[2] + (etk[3] << 8));
 		return true;
+	case STMT_BREAK:
+		while (csp > 0)
+		{
+			csp--;
+			switch (callstack[csp].type)
+			{
+			case CSTACK_WHILE:
+				tk = callstack[csp].tk;
+				exectk = (char *)(tk[2] + (tk[3] << 8));
+				return true;
+			case CSTACK_CALL:
+				runtime_error = RERR_INVALID_BREAK;
+				return true;
+			} 
+		}
+		runtime_error = RERR_INVALID_BREAK;
+		return true;
 	case STMT_WHILE:
 	case STMT_IF:
 		tk += 4;

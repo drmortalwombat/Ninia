@@ -11,6 +11,7 @@ const char * const runtime_error_names[NUM_ERRORS] =
 	p"Undefined symbol",
 	p"Out of memory",
 	p"Invalid assign",
+	p"Invalid break",
 };
 
 RuntimeError	runtime_error;

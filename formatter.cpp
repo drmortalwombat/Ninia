@@ -403,6 +403,10 @@ const char * format_statement(const char * tk, char * str, char * col)
 		case STMT_RETURN:
 			l = format_append(str, col, l, VCOL_WHITE, p"RETURN ");
 			return format_expression(tk, str, col, l);
+		case STMT_BREAK:
+			l = format_append(str, col, l, VCOL_WHITE, p"BREAK");
+			str[l] = 0;
+			return tk;
 		case STMT_RETURN_NULL:
 			l = format_append(str, col, l, VCOL_WHITE, p"RETURN");
 			str[l] = 0;
