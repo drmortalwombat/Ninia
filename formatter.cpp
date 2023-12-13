@@ -173,6 +173,10 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 				format_insert(str, color, stack[sp-1], si, '!');
 				si++;
 				break;
+			case TK_LENGTH:
+				format_insert(str, color, stack[sp-1], si, '#');
+				si++;
+				break;
 			}
 			break;
 
@@ -283,6 +287,7 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 						format_insert(str, color, stack[sp-1], si, t == TK_LIST ? '(' : '[');
 					else
 					{
+						stack[sp++] = si;
 						str[si] = t == TK_LIST ? '(' : '[';
 						color[si] = VCOL_MED_GREY;
 					}
@@ -306,6 +311,7 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 					}
 					else
 					{
+						stack[sp++] = si;
 						str[si] = '{';
 						color[si] = VCOL_MED_GREY;
 						si ++;

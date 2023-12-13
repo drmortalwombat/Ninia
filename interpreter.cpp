@@ -757,6 +757,7 @@ void interpret_binop(char t)
 bool interpret_expression(void)
 {
 	const char * tk = exectk;
+	char	tmp[2];
 
 	char	ti = 0;
 	for(;;)
@@ -891,6 +892,29 @@ bool interpret_expression(void)
 						valpush(TYPE_NUMBER, 0);
 					}
 				}	break;
+			case TK_LENGTH:
+				{
+					valderef(0);
+					char t = typeget(0);
+					if ((t & TYPE_MASK) == TYPE_STRING)
+					{
+						const char * str = valstring(0, tmp);
+						esp ++;
+						valpush(TYPE_NUMBER, (unsigned long)str[0] << 16);
+					}
+					else if (t == TYPE_ARRAY)
+					{
+						MemArray * ma = (MemArray *)valmem(0);
+						esp ++;
+						valpush(TYPE_NUMBER, (unsigned long)ma->size << 16);
+					}
+					else
+					{
+						esp ++;
+						valpush(TYPE_NUMBER, 0);
+					}
+
+				} break;
 			default:
 				__assume(false);
 			}

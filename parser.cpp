@@ -259,6 +259,11 @@ char * parse_expression(const char * str, char * tk)
 				ni = parse_op(tk, ni, TK_NOT);
 			prefix = true;
 			break;
+		case '#':
+			ni = parse_op(tk, ni, TK_LENGTH);
+			c = str[si++];
+			prefix = true;
+			break;
 		case '=':
 			c = str[si++];
 			if (c == '=')

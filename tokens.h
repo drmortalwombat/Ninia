@@ -61,6 +61,7 @@
 
 #define TK_NEGATE			(TK_PREFIX + 0)
 #define TK_NOT				(TK_PREFIX + 1)
+#define TK_LENGTH			(TK_PREFIX + 2)
 
 #define TK_ASSIGN_ADD		(TK_ASSIGN + 1)
 #define TK_ASSIGN_SUB		(TK_ASSIGN + 2)
