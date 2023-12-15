@@ -157,6 +157,11 @@ void valpush(char type, long value)
 	}
 }
 
+void valpushchar(char ch)
+{
+	valpush(TYPE_STRING_SHORT, 1 | ((unsigned)ch << 8));
+}
+
 void valassign(void)
 {
 	switch (estack[esp + 1].type)
@@ -231,7 +236,9 @@ void valswap(void)
 	estack[esp + 1] = es;
 }
 
-const char * valstring(char at, char * buffer)
+const char emptystr[1] = {0};
+
+const char * valstring(char at, char * tmp)
 {
 	char ei = esp + at;
 	switch (estack[ei].type)
@@ -239,14 +246,16 @@ const char * valstring(char at, char * buffer)
 	case TYPE_STRING_LITERAL:
 		return (const char *)estack[ei].value;
 	case TYPE_STRING_SHORT:
-		buffer[0] = 1;
-		buffer[1] = (char)((unsigned long)(estack[ei].value) >> 16);
-		return buffer;
+		tmp[0] = estack[ei].value;
+		tmp[1] = estack[ei].value >> 8;
+		tmp[2] = estack[ei].value >> 16;
+		tmp[3] = estack[ei].value >> 24;
+		return tmp;
 	case TYPE_STRING_HEAP:
 		return ((MemString *)estack[ei].value)->data;
+	default:
+		return emptystr;
 	}
-	buffer[0] = 0;
-	return buffer;
 }
 
 inline MemHead * valmem(char at)
@@ -336,30 +345,59 @@ MemString * string_allocate(char size)
 	return s;
 }
 
+MemString * string_allocate(const char * str, char size)
+{
+	MemString	*	s = (MemString *)mem_allocate(MEM_STRING, sizeof(MemString) + size);
+	if (s)
+	{
+		s->data[0] = size;
+		for(char i=0; i<size; i++)
+			s->data[i + 1] = str[i];
+	}
+	return s;
+}
+
 MemString * string_allocate(const char * str)
 {
 	char i = 0;
 	while (str[i])
 		i++;
-
-	MemString	*	s = (MemString *)mem_allocate(MEM_STRING, sizeof(MemString) + i);
-	if (s)
-	{
-		s->data[0] = i;
-		i = 0;
-		while (char c = str[i])
-		{
-			i++;
-			s->data[i] = c;
-		}
-	}
-	return s;
+	return string_allocate(str, i);
 }
 
+void valpushstring(const char * str, char size)
+{
+	switch (size)
+	{
+	case 0:
+		valpush(TYPE_STRING_SHORT, 0);
+		break;
+	case 1:
+		valpush(TYPE_STRING_SHORT, 1 | ((unsigned)str[0] << 8));
+		break;
+	case 2:
+		valpush(TYPE_STRING_SHORT, 2 | ((unsigned)str[0] << 8) | ((unsigned long)str[1] << 16));
+		break;
+	case 3:
+		valpush(TYPE_STRING_SHORT, 3 | ((unsigned)str[0] << 8) | ((unsigned long)str[1] << 16) | ((unsigned long)str[2] << 24));
+		break;
+	default:
+		valpush(TYPE_STRING_HEAP, (unsigned)string_allocate(str, size));
+		break;
+	}
+}
+
+void valpushstring(const char * str)
+{
+	char i = 0;
+	while (str[i])
+		i++;
+	valpushstring(str, i);
+}
 
 void interpret_builtin(char n)
 {
-	char tmp[80], tmp2[20];
+	char tmp[80], tmp1[20], tmp2[20];
 	unsigned lf = valget(n);
 
 	if ((lf & 0xff00) != 0x0100)
@@ -431,7 +469,7 @@ void interpret_builtin(char n)
 					} break;
 				case TYPE_STRING:
 					{
-						const char * str = valstring(k, tmp);
+						const char * str = valstring(k, tmp1);
 						char n = str[0];
 						for(char i=0; i<n; i++)
 							system_putch(str[i + 1]);
@@ -469,7 +507,7 @@ void interpret_builtin(char n)
 			char t = typeget(0);
 			if ((t & TYPE_MASK) == TYPE_STRING)
 			{
-				const char * str = valstring(0, tmp);
+				const char * str = valstring(0, tmp1);
 				esp += n + 1;
 				valpush(TYPE_NUMBER, (unsigned long)str[0] << 16);
 			}
@@ -489,9 +527,9 @@ void interpret_builtin(char n)
 	case RTSYM_CHR:
 		{
 			valderef(0);
-			long li = valpop() & 0x00ff0000ul;
+			unsigned li = valpop() >> 16;
 			esp += n;
-			valpush(TYPE_STRING_SHORT, li);
+			valpushchar(li);
 		} break;
 	case RTSYM_ARRAY:
 		{
@@ -552,7 +590,7 @@ void interpret_builtin(char n)
 			{
 				char k = n - i - 1;
 				valderef(k);
-				const char * str = valstring(k, tmp);
+				const char * str = valstring(k, tmp1);
 				t += str[0];
 			}
 			MemString	*	ms = string_allocate(t);
@@ -564,7 +602,7 @@ void interpret_builtin(char n)
 				for(char i=0; i<n; i++)
 				{
 					char k = n - i - 1;
-					const char * str = valstring(k, tmp);
+					const char * str = valstring(k, tmp1);
 					char s = str[0];
 					for(char j=0; j<s; j++)
 						dstr[++t] = str[j + 1];
@@ -578,7 +616,7 @@ void interpret_builtin(char n)
 
 	case RTSYM_SEG:
 		{
-			int num = 250;
+			int num = 255;
 			if (n > 2)
 			{
 				valderef(n - 3);
@@ -590,36 +628,21 @@ void interpret_builtin(char n)
 			char t = typeget(n - 1);
 			if ((t & TYPE_MASK) == TYPE_STRING)
 			{
-				const char * str = valstring(n - 1, tmp);
+				const char * str = valstring(n - 1, tmp1);
 
 				int start = valget(n - 2) >> 16;
 				if (start < 0)
-					start == 0;
+				{
+					num += start;
+					start = 0;
+				}
+				if (start + num > str[0])
+					num = str[0] - start;
+				if (num < 0)
+					num = 0;
 	
 				esp += n + 1;
-
-				if (start >= str[0] || num <= 0)
-					valpush(TYPE_STRING_SHORT, 0);
-				else if (num == 1)
-					valpush(TYPE_STRING_SHORT, (unsigned long)str[start] << 16);
-				else
-				{
-					if (start + num > str[0])
-						num = str[0] - start;
-
-					MemString	*	ms = string_allocate(num);
-					if (ms)
-					{
-						char * dstr = ms->data;
-
-						t = 0;
-						for(char i=0; i<num; i++)
-							dstr[++t] = str[i + start + 1];
-						valpush(TYPE_STRING_HEAP, (unsigned)ms);
-					}
-					else
-						valpush(TYPE_NULL, 0);					
-				}
+				valpushstring(str + start + 1, num);
 			}
 			else
 			{
@@ -634,7 +657,7 @@ void interpret_builtin(char n)
 			char t = typeget(0);
 			if ((t & TYPE_MASK) == TYPE_STRING)
 			{
-				const char * str = valstring(0, tmp);
+				const char * str = valstring(0, tmp1);
 				esp += n + 1;
 				valpush(TYPE_NUMBER, str[0] > 0 ? (unsigned long)str[1] << 16 : 0);
 			}
@@ -648,7 +671,7 @@ void interpret_builtin(char n)
 	case RTSYM_VAL:
 		{
 			valderef(0);
-			const char * str = valstring(0, tmp);
+			const char * str = valstring(0, tmp1);
 
 			long l;
 			number_parse(str + 1, str[0], l);
@@ -667,14 +690,10 @@ void interpret_builtin(char n)
 			}
 			else
 			{
-				long	s = valget(0);
-				
+				long	s = valget(0);				
 				const char * str = number_format(s, true);
-
-				MemString	*	ms = string_allocate(str);
-
 				esp += n + 1;
-				valpush(TYPE_STRING_HEAP, (unsigned)ms);
+				valpushstring(str);
 			}
 		} break;
 	case RTSYM_FLOOR:
@@ -706,7 +725,7 @@ void interpret_builtin(char n)
 			char t = typeget(n - 1);
 			if ((t & TYPE_MASK) == TYPE_STRING)
 			{
-				const char * str = valstring(n - 1, tmp);
+				const char * str = valstring(n - 1, tmp1);
 				const char * find = valstring(n - 2, tmp2);
 
 				esp += n + 1;
@@ -748,7 +767,7 @@ void interpret_builtin(char n)
 						fid++;
 					if (fid < 8)
 					{
-						const char * fname = valstring(n - 3, tmp);
+						const char * fname = valstring(n - 3, tmp1);
 						krnio_setnam_n(fname + 1, fname[0]);
 
 						if (krnio_open(fid + 1, valget(n - 1) >> 16, valget(n - 2) >> 16))
@@ -824,7 +843,7 @@ void interpret_builtin(char n)
 						else if ((typeget(n - 2) & TYPE_MASK) == TYPE_STRING)
 						{
 							limit = 255;
-							guard = valstring(n - 2, tmp2);
+							guard = valstring(n - 2, tmp1);
 						}
 					}
 					esp += n + 1;
@@ -852,17 +871,7 @@ void interpret_builtin(char n)
 						}							
 						krnio_clrchn();
 
-						if (i == 0)
-							valpush(TYPE_NULL, 0);
-						else if (i == 1)
-							valpush(TYPE_STRING_SHORT, (long)tmp[0] << 16);
-						else
-						{
-							tmp[i] = 0;
-							MemString	*	ms = string_allocate(tmp);
-
-							valpush(TYPE_STRING_HEAP, (unsigned)ms);
-						}
+						valpushstring(tmp, i);
 					}
 					else
 						valpush(TYPE_NULL, 0);
@@ -887,7 +896,7 @@ void interpret_builtin(char n)
 
 					if (filemask & (1 << fid))
 					{						
-						const char * str = valstring(n - 2, tmp);
+						const char * str = valstring(n - 2, tmp1);
 						krnio_chkout(fid + 1);
 						char n = str[0];
 						for(char i=0; i<n; i++)
@@ -974,7 +983,7 @@ void interpret_binop(char t)
 bool interpret_expression(void)
 {
 	const char * tk = exectk;
-	char	tmp[2];
+	char tmp1[4], tmp2[4];
 
 	char	ti = 0;
 	for(;;)
@@ -1056,10 +1065,8 @@ bool interpret_expression(void)
 				}
 				else if ((tm & TYPE_MASK) == TYPE_STRING)
 				{
-					char sb0[2], sb1[2];
-
-					const char * s2 = valstring(0, sb0);
-					const char * s1 = valstring(1, sb1);
+					const char * s2 = valstring(0, tmp1);
+					const char * s1 = valstring(1, tmp2);
 					esp += 2;
 
 					char i = 0;
@@ -1115,7 +1122,7 @@ bool interpret_expression(void)
 					char t = typeget(0);
 					if ((t & TYPE_MASK) == TYPE_STRING)
 					{
-						const char * str = valstring(0, tmp);
+						const char * str = valstring(0, tmp1);
 						esp ++;
 						valpush(TYPE_NUMBER, (unsigned long)str[0] << 16);
 					}
@@ -1155,13 +1162,12 @@ bool interpret_expression(void)
 					}
 					else if ((t & TYPE_MASK) == TYPE_STRING)
 					{
-						char tmp[2];
-						const char * s = valstring(0, tmp);
+						const char * s = valstring(0, tmp1);
 						int si = ei >> 16;
 						if (si >= 0 && si < s[0])
 						{
 							esp++;
-							valpush(TYPE_STRING_SHORT, (unsigned long)s[si + 1] << 16);
+							valpush(TYPE_STRING_SHORT, 1 | ((unsigned)s[si + 1] << 8));
 						}
 						else
 						{
