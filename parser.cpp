@@ -35,7 +35,7 @@ char oppri(char op)
 	case TK_RELATIONAL:
 		return 20;
 	case TK_ASSIGN:
-		return 30;
+		return 40;
 	case TK_PREFIX:
 		return 5;
 	case TK_POSTFIX:
@@ -50,6 +50,8 @@ char oppri(char op)
 			return 1;
 		case TK_DOT:
 			return 4;
+		case TK_DOTDOT:
+			return 30;
 		case TK_COMMA:
 			return 0x7f;
 		case TK_LIST:
@@ -255,8 +257,14 @@ char * parse_expression(const char * str, char * tk)
 			prefix = true;
 			break;
 		case '.':
-			ni = parse_op(tk, ni, TK_DOT);
 			c = str[si++];
+			if (c == '.')
+			{
+				ni = parse_op(tk, ni, TK_DOTDOT);
+				c = str[si++];
+			}
+			else
+				ni = parse_op(tk, ni, TK_DOT);
 			prefix = true;
 			break;
 		case '!':

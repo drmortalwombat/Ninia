@@ -117,6 +117,7 @@ char * prepare_expression(char * tk, bool var)
 					break;
 				case TK_COLON:
 				case TK_DOT:
+				case TK_DOTDOT:
 					tk++;
 					left = false;
 					break;
@@ -323,6 +324,7 @@ char * restore_expression(char * tk, bool var)
 					break;
 				case TK_COLON:
 				case TK_DOT:
+				case TK_DOTDOT:
 					tk++;
 					left = false;
 					break;

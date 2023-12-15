@@ -79,6 +79,7 @@
 #define TK_ARRAY			(TK_CONTROL + 6)
 #define TK_STRUCT			(TK_CONTROL + 7)
 #define TK_BYTES			(TK_CONTROL + 8)
+#define TK_DOTDOT			(TK_CONTROL + 9)
 
 #define STMT_END			0x00
 #define STMT_ERROR			0x01
@@ -115,6 +116,7 @@
 #define TYPE_NULL			(TYPE_COMPLEX | 0)
 #define TYPE_SYMBOL			(TYPE_COMPLEX | 1)
 #define TYPE_FUNCTION		(TYPE_COMPLEX | 2)
+#define TYPE_RANGE			(TYPE_COMPLEX | 3)
 
 #define TYPE_ARRAY			(TYPE_COMPLEX | 0 | TYPE_HEAP)
 #define TYPE_STRUCT			(TYPE_COMPLEX | 1 | TYPE_HEAP)

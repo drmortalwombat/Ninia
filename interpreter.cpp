@@ -1041,6 +1041,55 @@ bool interpret_expression(void)
 				{
 					interpret_binop(t);
 				}
+				else if (t == TK_ADD)
+				{
+					if ((tm & TYPE_MASK) == TYPE_STRING)
+					{
+						const char * s2 = valstring(0, tmp1);
+						const char * s1 = valstring(1, tmp2);
+
+						MemString	*	ms = string_allocate(s1[0] + s2[0]);
+						if (ms)
+						{
+							char * dstr = ms->data;
+
+							const char * s2 = valstring(0, tmp1);
+							const char * s1 = valstring(1, tmp2);
+
+							memcpy(dstr + 1, s1 + 1, s1[0]);
+							memcpy(dstr + 1 + s1[0], s2 + 1, s2[0]);
+							dstr[0] = s1[0] + s2[0];
+
+							esp += 2;
+							valpush(TYPE_STRING_HEAP, (unsigned)ms);
+						}
+					}
+					else if (typeget(0) == TYPE_ARRAY && typeget(1) == TYPE_ARRAY)
+					{
+						MemArray * ma = (MemArray *)valmem(1);
+						MemArray * mb = (MemArray *)valmem(0);
+
+						int size = ma->size + mb->size;
+						MemArray	*	mn = array_allocate(size, size);
+						if (mn)
+						{
+							ma = (MemArray *)valmem(1);
+							mb = (MemArray *)valmem(0);
+
+							MemValues	*	mnv = (MemValues *)(mn + 1);
+							MemValues	*	mav = (MemValues *)ma->mh;
+							MemValues	*	mbv = (MemValues *)mb->mh;
+
+							memcpy(mnv->values, mav->values, sizeof(Value) * ma->size);
+							memcpy(mnv->values + ma->size, mbv->values, sizeof(Value) * mb->size);
+
+							esp+=2;
+							valpush(TYPE_ARRAY, (unsigned)mn);
+						}
+					}
+					else
+						runtime_error = RERR_INVALID_TYPES;
+				}
 				else
 					runtime_error = RERR_INVALID_TYPES;
 			}	break;
@@ -1152,28 +1201,80 @@ bool interpret_expression(void)
 					char n = tk[ti++];
 
 					valderef(0);
+					char et = typeget(0);
 					long ei = valpop();
 					valderef(0);
 					char t = typeget(0);
 					if (t == TYPE_ARRAY)
 					{
-						estack[esp].type = TYPE_ARRAY_REF;
-						estack[esp].value |= ei & 0xffff0000ul;
-					}
-					else if ((t & TYPE_MASK) == TYPE_STRING)
-					{
-						const char * s = valstring(0, tmp1);
-						int si = ei >> 16;
-						if (si >= 0 && si < s[0])
+						if (et == TYPE_NUMBER)
 						{
-							esp++;
-							valpush(TYPE_STRING_SHORT, 1 | ((unsigned)s[si + 1] << 8));
+							estack[esp].type = TYPE_ARRAY_REF;
+							estack[esp].value |= ei & 0xffff0000ul;
+						}
+						else if (et == TYPE_RANGE)
+						{
+							int start = ei >> 16;
+							int end = ei + 1;
+
+							MemArray * ma = (MemArray *)valmem(0);
+
+							if (start < 0)
+								start = 0;
+							if (end > ma->size)								
+								end = ma->size;
+
+							if (end > start)
+							{
+								MemArray	*	mn = array_allocate(end - start, end - start);
+								ma = (MemArray *)valmem(0);
+
+								MemValues	*	mv = (MemValues *)ma->mh;
+								MemValues	*	mnv = (MemValues *)(mn + 1);
+
+								memcpy(mnv->values, mv->values + start, sizeof(Value) * (end - start));
+
+								esp++;
+								valpush(TYPE_ARRAY, (unsigned)mn);
+							}
+							else
+							{
+								esp++;
+								valpush(TYPE_NULL, 0);
+							}
 						}
 						else
+							runtime_error = RERR_INVALID_TYPES;					
+					}
+					else if ((t & TYPE_MASK) == TYPE_STRING)
+					{						
+						const char * s = valstring(0, tmp1);
+						esp++;
+
+						if (et == TYPE_NUMBER)
 						{
-							esp++;
-							valpush(TYPE_STRING_SHORT, 0);
+							int si = ei >> 16;
+							if (si >= 0 && si < s[0])
+								valpush(TYPE_STRING_SHORT, 1 | ((unsigned)s[si + 1] << 8));
+							else
+								valpush(TYPE_STRING_SHORT, 0);
 						}
+						else if (et == TYPE_RANGE)
+						{
+							int start = ei >> 16;
+							int end = ei + 1;
+
+							if (start < 0)
+								start = 0;
+							if (end > s[0])
+								end = s[0];
+							if (end > start)
+								valpushstring(s + 1 + start, end - start);
+							else
+								valpush(TYPE_STRING_SHORT, 0);
+						}
+						else
+							runtime_error = RERR_INVALID_TYPES;					
 					}
 					else
 						runtime_error = RERR_INVALID_TYPES;					
@@ -1255,6 +1356,13 @@ bool interpret_expression(void)
 					estack[esp].type = TYPE_STRUCT_REF;
 					estack[esp].value |= ei << 16;
 					break;
+				case TK_DOTDOT:
+					{
+						unsigned long i1 = valpop() >> 16;
+						unsigned long i0 = valpop() >> 16;
+
+						valpush(TYPE_RANGE, (i0 << 16) | i1);
+					}	break;
 				case TK_STRING:
 				case TK_BYTES:
 					valpush(TYPE_STRING_LITERAL, (unsigned)(tk + ti));

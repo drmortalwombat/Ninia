@@ -245,6 +245,10 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 				format_insert(str, color, stack[--sp], si, ':');
 				si++;
 				break;
+			case TK_DOTDOT:
+				format_insert2(str, color, stack[--sp], si, '.', '.');
+				si += 2;
+				break;
 			case TK_STRING:
 				{
 					stack[sp++] = si;

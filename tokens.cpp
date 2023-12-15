@@ -113,7 +113,7 @@ char number_parse(const char * str, char n, long & lr)
 	}
 
 	lr = (long)num << 16;
-	if (i < n && str[i] == '.')
+	if (i < n && str[i] == '.' && str[i + 1] != '.')
 	{
 
 		unsigned long fract = 0;
