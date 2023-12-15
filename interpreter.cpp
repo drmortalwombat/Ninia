@@ -5,6 +5,7 @@
 #include <fixmath.h>
 #include <time.h>
 #include <conio.h>
+#include <c64/kernalio.h>
 
 __zeropage char		esp;
 
@@ -26,6 +27,8 @@ char csp, cfp;
 
 __striped unsigned		localvars[32];
 
+char	filemask;
+
 #pragma bss( bss )
 
 const char * exectk;
@@ -41,7 +44,7 @@ unsigned int urand(void)
 	return useed;
 }
 
-void interpreter_init(char * tk)
+void interpret_init(char * tk)
 {
 	exectk = tk;
 	esp = VALUE_STACK_SIZE;
@@ -51,6 +54,15 @@ void interpreter_init(char * tk)
 	callstack[0].type = CSTACK_NONE;
 	useed = clock() ^ 0x3417;
 	mem_init();
+	filemask = 0;
+}
+
+void interpret_reset(void)
+{
+	for(char i=0; i<8; i++)
+		if (filemask & (1 << i))
+			krnio_close(i + 1);
+	filemask = 0;
 }
 
 
@@ -347,7 +359,7 @@ MemString * string_allocate(const char * str)
 
 void interpret_builtin(char n)
 {
-	char tmp[80], tmp2[2];
+	char tmp[80], tmp2[20];
 	unsigned lf = valget(n);
 
 	if ((lf & 0xff00) != 0x0100)
@@ -719,6 +731,200 @@ void interpret_builtin(char n)
 				esp += n + 1;
 				valpush(TYPE_NUMBER, 0xffff0000ul);
 			}
+		} break;
+
+	case RTSYM_FOPEN:
+		{
+			if (n == 3)
+			{
+				valderef(n - 1);
+				valderef(n - 2);
+				valderef(n - 3);
+				if (typeget(n - 1) == TYPE_NUMBER && typeget(n - 2) == TYPE_NUMBER && (typeget(n - 3) & TYPE_MASK) == TYPE_STRING)
+				{
+
+					char fid = 0;
+					while (fid < 8 & (filemask & (1 << fid)))
+						fid++;
+					if (fid < 8)
+					{
+						const char * fname = valstring(n - 3, tmp);
+						krnio_setnam_n(fname + 1, fname[0]);
+
+						if (krnio_open(fid + 1, valget(n - 1) >> 16, valget(n - 2) >> 16))
+						{
+							filemask |= 1 << fid;
+
+							esp += n + 1;
+							valpush(TYPE_NUMBER, long(fid) << 16);
+						}
+						else
+						{
+							esp += n + 1;
+							valpush(TYPE_NUMBER, 0xffff0000ul);
+						}
+					}
+					else
+					{
+						esp += n + 1;
+						valpush(TYPE_NUMBER, 0xffff0000ul);
+					}
+				}
+				else
+					runtime_error = RERR_INVALID_ARGUMENTS;
+			}
+			else
+				runtime_error = RERR_INVALID_ARGUMENTS;
+		} break;
+
+	case RTSYM_FCLOSE:
+		{
+			if (n == 1)
+			{
+				valderef(n - 1);
+				if (typeget(n - 1) == TYPE_NUMBER)
+				{
+					char fid = valget(n - 1) >> 16;
+					if (filemask & (1 << fid))
+					{
+						krnio_close(fid + 1);
+						filemask &= ~(1 << fid);
+					}
+
+					esp += n + 1;
+				}
+				else
+					runtime_error = RERR_INVALID_ARGUMENTS;
+			}
+			else
+				runtime_error = RERR_INVALID_ARGUMENTS;
+		} break;
+
+	case RTSYM_FGET:
+		{
+			if (n >= 1)
+			{
+				valderef(n - 1);
+				if (typeget(n - 1) == TYPE_NUMBER)
+				{
+					char fid = valget(n - 1) >> 16;
+
+					const char * guard = tmp2;
+					char limit = 1;
+					tmp2[0] = 0;
+					if (n >= 2)
+					{
+						valderef(n - 2);
+						if (typeget(n - 2) == TYPE_NUMBER)
+						{
+							limit  = valget(n - 2) >> 16;
+							if (limit > 255)
+								limit = 255;							
+						}
+						else if ((typeget(n - 2) & TYPE_MASK) == TYPE_STRING)
+						{
+							limit = 255;
+							guard = valstring(n - 2, tmp2);
+						}
+					}
+					esp += n + 1;
+
+					if (limit > 0 && (filemask & (1 << fid)))
+					{
+						krnio_chkin(fid + 1);
+						char i = 0;
+						while (i < limit)
+						{
+							char ch = krnio_chrin();
+							krnioerr err = krnio_status();
+							krnio_pstatus[fid + 1] = err;
+							if (err && err != KRNIO_EOF)
+								break;
+							tmp[i++] = (char)ch;
+
+							char j = 0;
+							while (j < guard[0] && ch != guard[j + 1])
+								j++;
+							if (j < guard[0])
+								break;
+							if (err)
+								break;
+						}							
+						krnio_clrchn();
+
+						if (i == 0)
+							valpush(TYPE_NULL, 0);
+						else if (i == 1)
+							valpush(TYPE_STRING_SHORT, (long)tmp[0] << 16);
+						else
+						{
+							tmp[i] = 0;
+							MemString	*	ms = string_allocate(tmp);
+
+							valpush(TYPE_STRING_HEAP, (unsigned)ms);
+						}
+					}
+					else
+						valpush(TYPE_NULL, 0);
+				}
+				else
+					runtime_error = RERR_INVALID_ARGUMENTS;
+			}
+			else
+				runtime_error = RERR_INVALID_ARGUMENTS;
+
+		} break;
+
+	case RTSYM_FPUT:
+		{
+			if (n == 2)
+			{
+				valderef(n - 1);
+				valderef(n - 2);
+				if (typeget(n - 1) == TYPE_NUMBER && (typeget(n - 2) & TYPE_MASK) == TYPE_STRING)
+				{
+					char fid = valget(n - 1) >> 16;
+
+					if (filemask & (1 << fid))
+					{						
+						const char * str = valstring(n - 2, tmp);
+						krnio_chkout(fid + 1);
+						char n = str[0];
+						for(char i=0; i<n; i++)
+							krnio_chrout(str[i + 1]);
+						krnio_clrchn();
+					}
+
+					esp += n + 1;
+				}
+				else
+					runtime_error = RERR_INVALID_ARGUMENTS;
+			}
+			else
+				runtime_error = RERR_INVALID_ARGUMENTS;
+
+		} break;
+
+	case RTSYM_FEOF:
+		{
+			if (n == 1)
+			{
+				valderef(n - 1);
+				if (typeget(n - 1) == TYPE_NUMBER)
+				{
+					char fid = valget(n - 1) >> 16;
+					char status = KRNIO_NODEVICE;
+					if (filemask & (1 << fid))
+						status = krnio_pstatus[fid + 1];
+					
+					esp += n + 1;
+					valpush(TYPE_NUMBER, long(status) << 16);
+				}
+				else
+					runtime_error = RERR_INVALID_ARGUMENTS;
+			}
+			else
+				runtime_error = RERR_INVALID_ARGUMENTS;
 		} break;
 
 	default:

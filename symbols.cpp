@@ -7,6 +7,8 @@ struct Symbol
 	char		s[8];	
 }	symbols[NUM_SYMBOLS];
 
+#pragma code(tcode)
+
 const char *	rtsymbols[]  =
 {
 	p"abs",
@@ -33,6 +35,12 @@ const char *	rtsymbols[]  =
 	p"time",
 	p"chrin",
 	p"input",
+
+	p"fopen",
+	p"fclose",
+	p"fget",
+	p"fput",
+	p"feof"
 };
 
 #define NUM_RTSYMBOLS	(sizeof(rtsymbols) / sizeof(char *))

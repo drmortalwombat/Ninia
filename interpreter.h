@@ -19,9 +19,12 @@ extern const char * exectk;
 
 #pragma code(rcode)
 
-__noinline void interpreter_init(char * tk);
+__noinline void interpret_init(char * tk);
+
+__noinline void interpret_reset(void);
 
 __noinline void interpret_program(void);
+
 
 #pragma code(code)
 

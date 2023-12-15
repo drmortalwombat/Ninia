@@ -1,7 +1,5 @@
 #pragma once
 
-void symbols_init(void);
-
 // Symbol range 
 //		0.. 255 single character symbol
 // 	  256.. 511 system defined symbols
@@ -31,9 +29,20 @@ void symbols_init(void);
 #define RTSYM_CHRIN		0x14
 #define RTSYM_INPUT		0x15
 
+#define RTSYM_FOPEN		0x16
+#define RTSYM_FCLOSE	0x17
+#define RTSYM_FGET		0x18
+#define RTSYM_FPUT		0x19
+#define RTSYM_FEOF		0x1a
+
+#pragma code(tcode)
+
+void symbols_init(void);
 
 unsigned symbol_add(const char * s);
 
 const char * symbol_string(unsigned id);
+
+#pragma code(code)
 
 #pragma compile("symbols.cpp")

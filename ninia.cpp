@@ -21,7 +21,7 @@ edit_cmd_t	filename;
 
 void ninia_main(void)
 {
-	symbols_init();
+	SYS_VCALL(symbols_init);
 
 	SYS_VCALL(edit_init);
 
@@ -41,9 +41,9 @@ void ninia_main(void)
 				SYS_VPCALL(parse_pretty, starttk);
 				SYS_VPCALL(prepare_statements, starttk);
 
-				SYS_VPCALL(interpreter_init, starttk);
-
+				SYS_VPCALL(interpret_init, starttk);
 				SYS_VCALL(interpret_program);
+				SYS_VCALL(interpret_reset);
 
 				SYS_VPCALL(restore_statements, starttk);
 
