@@ -468,7 +468,7 @@ char tolower(char ch)
 char * parse_statement(const char * str, char * tk)
 {
 	char l = 0;
-	while (str[l] == ' ')
+	while (str[l] == ' ' || str[l] == 160)
 		l++;
 
 	char * etk = tk;

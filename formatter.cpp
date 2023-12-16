@@ -363,7 +363,7 @@ const char * format_statement(const char * tk, char * str, char * col)
 		char l = *tk++ - 1;
 		for(char i=0; i<l; i++)
 		{
-			str[i] = ' ';
+			str[i] = 160;
 			col[i] = VCOL_DARK_GREY;
 		}
 
