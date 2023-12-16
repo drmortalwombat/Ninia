@@ -29,6 +29,7 @@
 #pragma section( tdata, 0 )
 #pragma region( tbank, 0x8000, 0xb000, , BANK_TOKENS, { tcode, tdata } )
 
+#pragma region( zeropage, 0xf7, 0x100, , , { zeropage } )
 
 static char * const Screen = (char *)0xcc00;
 static char * const Color = (char *)0xd800;

@@ -26,9 +26,10 @@ char oppri(char op)
 		case TK_ADD:
 		case TK_SUB:
 			return 12;
-		case TK_OR:
 		case TK_AND:
 			return 25;
+		case TK_OR:
+			return 26;
 		}
 		return 0;
 

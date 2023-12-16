@@ -38,20 +38,20 @@ char format_insert_sym(char * str, char * color, char si, char ei, char c, unsig
 
 	do {
 		ei--;
-		str[ei + n + 2] = str[ei];
-		color[ei + n + 2] = color[ei];
+		str[(char)(ei + n + 2)] = str[ei];
+		color[(char)(ei + n + 2)] = color[ei];
 	} while (si != ei);
 	str[si] = c;
 	color[si] = VCOL_MED_GREY;
 
 	for(char i=0; i<n; i++)
 	{
-		str[si + i + 1] = s[i];
-		color[si + i + 1] = VCOL_YELLOW;
+		str[(char)(si + i + 1)] = s[i];
+		color[(char)(si + i + 1)] = VCOL_YELLOW;
 	}
 
-	str[si + n + 1] = ':';
-	color[si + n + 1] = VCOL_MED_GREY;
+	str[(char)(si + n + 1)] = ':';
+	color[(char)(si + n + 1)] = VCOL_MED_GREY;
 
 	return n + 2;
 }
