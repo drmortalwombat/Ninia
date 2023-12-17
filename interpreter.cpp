@@ -19,8 +19,8 @@ char efp;
 __striped struct CallStack
 {
 	char			efp, esp, cfp;
-	char			token, type;
-	const char	*	tk;
+	char			type;
+	const char	*	tk, * etk;
 }	callstack[CALL_STACK_SIZE];
 
 char csp, cfp;
@@ -31,8 +31,7 @@ char	filemask;
 
 #pragma bss( bss )
 
-const char * exectk;
-char exect;
+const char * exectk, * execetk;
 
 unsigned useed;
 
@@ -525,30 +524,6 @@ void interpret_builtin(char n)
 			runtime_error = RERR_INVALID_ARGUMENTS;
 		break;
 
-	case RTSYM_LEN:
-		{
-			valderef(0);
-			char t = typeget(0);
-			if ((t & TYPE_MASK) == TYPE_STRING)
-			{
-				const char * str = valstring(0, tmp1);
-				esp += n + 1;
-				valpush(TYPE_NUMBER, (unsigned long)str[0] << 16);
-			}
-			else if (t == TYPE_ARRAY)
-			{
-				MemArray * ma = (MemArray *)valmem(0);
-				esp += n + 1;
-				valpush(TYPE_NUMBER, (unsigned long)ma->size << 16);
-			}
-			else
-			{
-				esp += n + 1;
-				valpush(TYPE_NUMBER, 0);
-			}
-
-		} break;
-
 	case RTSYM_CHR:
 		for(char i=0; i<n; i++)
 		{
@@ -609,6 +584,28 @@ void interpret_builtin(char n)
 			runtime_error = RERR_INVALID_ARGUMENTS;
 		break;
 
+	case RTSYM_SHIFT:
+		if (n == 1)
+		{
+			valderef(0);
+
+			MemArray * ma = (MemArray *)valmem(0);
+			MemValues * mv = (MemValues *)ma->mh;
+
+			esp += 1;
+			estack[esp] = mv->values[0];
+
+			ma->size--;
+
+			int sz = ma->size;
+			for(int i=0; i<sz; i++)
+				mv->values[i] = mv->values[i + 1];
+			mv->values[sz].type = TYPE_NULL;
+		}
+		else
+			runtime_error = RERR_INVALID_ARGUMENTS;
+		break;
+
 	case RTSYM_POP:
 		if (n == 1)
 		{
@@ -657,43 +654,6 @@ void interpret_builtin(char n)
 			}
 			else
 				valpush(TYPE_NULL, 0);
-		} break;
-
-	case RTSYM_SEG:
-		{
-			int num = 255;
-			if (n > 2)
-			{
-				valderef(n - 3);
-				num = valget(n - 3) >> 16;
-			}
-
-			valderef(n - 1);
-			valderef(n - 2);
-			char t = typeget(n - 1);
-			if ((t & TYPE_MASK) == TYPE_STRING)
-			{
-				const char * str = valstring(n - 1, tmp1);
-
-				int start = valget(n - 2) >> 16;
-				if (start < 0)
-				{
-					num += start;
-					start = 0;
-				}
-				if (start + num > str[0])
-					num = str[0] - start;
-				if (num < 0)
-					num = 0;
-	
-				esp += n + 1;
-				valpushstring(str + start + 1, num);
-			}
-			else
-			{
-				esp += n + 1;
-				valpush(TYPE_NULL, 0);					
-			}
 		} break;
 
 	case RTSYM_ASC:
@@ -964,6 +924,7 @@ void interpret_builtin(char n)
 				}
 
 				esp += n + 1;
+				valpush(TYPE_NULL, 0);
 			}
 			else
 				runtime_error = RERR_INVALID_ARGUMENTS;
@@ -993,6 +954,91 @@ void interpret_builtin(char n)
 			runtime_error = RERR_INVALID_ARGUMENTS;
 		break;
 
+	case RTSYM_CPUT:
+		if (n == 4)
+		{
+			valderef(0);
+			valderef(1);
+			valderef(2);
+			valderef(3);
+
+			int x = valget(3) >> 16, y = valget(2) >> 16;
+			char ch = valget(1) >> 16, co = valget(0) >> 16;
+
+			if (x >= 0 && x < 40 && y >= 0 && y < 25)
+			{
+				unsigned	o = y * 40 + x;
+				*(char *)(0x0400 + o) = ch;
+				*(char *)(0xd800 + o) = co;
+			}
+
+			esp += 5;
+			valpush(TYPE_NULL, 0);
+		}
+		else
+			runtime_error = RERR_INVALID_ARGUMENTS;
+		break;
+	case RTSYM_CGET:
+		if (n == 2)
+		{
+			valderef(0);
+			valderef(1);
+
+			int x = valget(1) >> 16, y = valget(0) >> 16;
+			char ch = 0;
+
+			if (x >= 0 && x < 40 && y >= 0 && y < 25)
+			{
+				unsigned	o = y * 40 + x;
+				ch = *(char *)(0x0400 + o);
+			}
+
+			esp += 3;
+			valpush(TYPE_NUMBER, long(ch) << 16);
+		}
+		else
+			runtime_error = RERR_INVALID_ARGUMENTS;
+		break;
+	case RTSYM_CFILL:
+		if (n == 6)
+		{
+			for(char i=0; i<6; i++)
+				valderef(i);
+
+			int x0 = valget(5) >> 16, y0 = valget(4) >> 16;
+			int x1 = x0 + (valget(3) >> 16), y1 = y0 + (valget(2) >> 16);
+			char ch = valget(1) >> 16, co = valget(0) >> 16;
+
+			if (x0 < 0) x0 = 0;
+			if (y0 < 0) y0 = 0;
+			if (x1 > 40) x1 = 40;
+			if (y1 > 25) y1 = 25;
+
+			if (x1 > x0 && y1 > y0)
+			{
+				unsigned	o = y0 * 40 + x0;
+
+				char * chp = (char *)(0x0400 + o), * cop = (char *)(0xd800 + o);
+
+				char w = x1 - x0, h = y1 - y0;
+				for(char y=0; y<h; y++)
+				{
+					for(char x=0; x<w; x++)
+					{
+						chp[x] = ch;
+						cop[x] = co;
+					}
+					chp += 40;
+					cop += 40;
+				}
+			}
+
+			esp += 7;
+			valpush(TYPE_NULL, 0);
+		}
+		else
+			runtime_error = RERR_INVALID_ARGUMENTS;
+		break;
 	default:
 		runtime_error = RERR_UNDEFINED_SYMBOL;
 	}
@@ -1296,8 +1342,9 @@ bool interpret_expression(void)
 							}
 							else
 							{
+								MemArray	*	mn = array_allocate(0, 0);
 								esp++;
-								valpush(TYPE_NULL, 0);
+								valpush(TYPE_ARRAY, (unsigned)mn);
 							}
 						}
 						else
@@ -1352,7 +1399,7 @@ bool interpret_expression(void)
 							callstack[csp].esp = esp + n;
 							callstack[csp].cfp = cfp;
 							callstack[csp].tk = tk + ti;
-							callstack[csp].token = exect;
+							callstack[csp].etk = execetk;
 							callstack[csp].type = CSTACK_CALL;
 							cfp = csp;
 
@@ -1563,7 +1610,7 @@ bool interpret_statement(void)
 	for(;;)
 	{
 		exectk = tk;
-		exect = t;
+		execetk = etk;
 
 		if (t == STMT_RETURN_NULL)
 			valpush(TYPE_NULL, 0);
@@ -1593,8 +1640,9 @@ bool interpret_statement(void)
 				cfp = callstack[csp].cfp;
 
 				tk = callstack[csp].tk;
-				t =  callstack[csp].token;
+				etk =  callstack[csp].etk;
 				callstack[csp].type = CSTACK_NONE;
+				t = etk[1];
 			} break;
 
 		case STMT_WHILE:
@@ -1634,6 +1682,7 @@ bool interpret_statement(void)
 				exectk = tk;
 				return true;
 			}
+			break;
 
 		default:
 			__assume(false);

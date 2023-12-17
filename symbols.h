@@ -12,10 +12,10 @@
 #define RTSYM_POKE		0x04
 #define RTSYM_PEEK		0x05
 
-#define RTSYM_LEN		0x06
+#define RTSYM_6			0x06
 #define RTSYM_CAT		0x07
 #define RTSYM_CHR		0x08
-#define RTSYM_SEG		0x09
+#define RTSYM_SHIFT		0x09
 #define RTSYM_ARRAY		0x0a
 #define RTSYM_PUSH		0x0b
 #define RTSYM_POP		0x0c
@@ -34,6 +34,11 @@
 #define RTSYM_FGET		0x18
 #define RTSYM_FPUT		0x19
 #define RTSYM_FEOF		0x1a
+
+#define RTSYM_CPUT		0x1b
+#define RTSYM_CGET		0x1c
+#define RTSYM_CFILL		0x1d
+#define RTSYM_CMOVE		0x1e
 
 #pragma code(tcode)
 

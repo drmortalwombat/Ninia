@@ -1,0 +1,104 @@
+# draw border around playfield
+DEF scrinit()
+ cfill(0,0,40,25,32,12)
+ cfill(0,0,40,1,160,12)
+ cfill(0,24,40,1,160,12)
+ cfill(0,1,1,23,160,12)
+ cfill(39,1,1,23,160,12)
+
+# add a fruit to the playfield
+DEF scrfruit()
+ WHILE 1
+  # random screen position
+  VAR x=floor(rand()*38+1)
+  VAR y=floor(rand()*23+1)
+  IF cget(x,y)==32
+   cput(x,y,83,7)
+   RETURN
+
+# global snake state
+VAR tail,hx,hy,dx,dy
+
+# initialize snake to center
+DEF snkinit()
+ tail=[]
+ hx=20,hy=12
+ dx=1,dy=0
+ cput(hx,hy,81,1)
+
+# advance snake by one field
+DEF snkmove()
+ # store head position into tail
+ push(tail,{x:hx,y:hy})
+ cput(hx,hy,81,14)
+ # advance head
+ hx+=dx,hy+=dy
+ # get char at new head position
+ VAR c=cget(hx,hy)
+ # draw new head
+ cput(hx,hy,81,1)
+ 
+ # check for collision
+ IF c==83
+  scrfruit()
+ ELSIF c==32
+  VAR p=shift(tail)
+  cput(p.x,p.y,32,0)
+ ELSE
+  RETURN 0
+ RETURN 1
+
+# flash snake after collision
+DEF snkflash()
+ # flash for one second
+ VAR t0=time()
+ WHILE time()-t0<1
+ 
+  # draw snake black
+  VAR j=0
+  WHILE j<#tail
+   VAR p=tail[j]
+   cput(p.x,p.y,81,0)
+   j+=1
+   
+  #draw snake white
+  j=0
+  WHILE j<#tail
+   VAR p=tail[j]
+   cput(p.x,p.y,81,1)
+   j+=1
+
+# main game loop
+WHILE 1
+ scrinit()
+ snkinit()
+ scrfruit()
+
+ # loop until collision
+ VAR t0=time()
+ WHILE snkmove()
+ 
+  # delay for 50ms
+  VAR t1=time()
+  WHILE t1-t0<0.05
+   t1=time()
+  t0=t1
+
+  # process player input
+  VAR c=chrin()
+  IF c==asc("w")
+   dx=0,dy=-1
+  ELSIF c==asc("a")
+   dx=-1,dy=0
+  ELSIF c==asc("s")
+   dx=0,dy=1
+  ELSIF c==asc("d")
+   dx=1,dy=0
+
+ snkflash()
+
+
+
+
+
+
