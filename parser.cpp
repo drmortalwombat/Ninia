@@ -157,6 +157,7 @@ char * parse_expression(const char * str, char * tk)
 			return tk + ni;
 
 		case ' ':
+		case 160:
 			c = str[si++];
 			break;			
 		case '(':
@@ -493,6 +494,18 @@ char * parse_statement(const char * str, char * tk)
 		*tk++ = 0;
 		tk = parse_expression(str + i, tk);
 	}
+	else if (!strcmp(idbuf, p"for"))
+	{
+		*tk++ = STMT_FOR;	
+		tk = parse_expression(str + i, tk);
+		if (tk)
+		{
+			*tk++ = l + 1;
+			*tk++ = STMT_NEXT;
+			*tk++ = 0;
+			*tk++ = 0;
+		}
+	}
 	else if (!strcmp(idbuf, p"if"))
 	{
 		*tk++ = STMT_IF;	
@@ -619,6 +632,7 @@ void parse_pretty(char * tk)
 		case STMT_ELSE:
 		case STMT_ELSIF:
 		case STMT_WHILE:
+		case STMT_FOR:
 			lmin = lmax = lmax + 1;
 			break;
 		}

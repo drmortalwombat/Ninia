@@ -391,6 +391,9 @@ const char * format_statement(const char * tk, char * str, char * col)
 		case STMT_WHILE:
 			l = format_append(str, col, l, VCOL_WHITE, p"WHILE ");
 			return format_expression(tk + 2, str, col, l);
+		case STMT_FOR:
+			l = format_append(str, col, l, VCOL_WHITE, p"FOR ");
+			return format_expression(tk, str, col, l) + 4;
 		case STMT_IF:
 			l = format_append(str, col, l, VCOL_WHITE, p"IF ");
 			return format_expression(tk + 2, str, col, l);

@@ -6,6 +6,7 @@
 #include <time.h>
 #include <conio.h>
 #include <c64/kernalio.h>
+#include <c64/vic.h>
 
 __zeropage char		esp;
 
@@ -1462,6 +1463,9 @@ bool interpret_expression(void)
 					break;
 				case TK_DOTDOT:
 					{
+						valderef(0);
+						valderef(1);
+						
 						unsigned long i1 = valpop() >> 16;
 						unsigned long i0 = valpop() >> 16;
 
@@ -1603,6 +1607,52 @@ bool interpret_statement(void)
 	case STMT_COMMENT:
 		exectk = tk + tk[2] + 3;
 		return true;
+	case STMT_NEXT:
+		{
+			if (estack[esp + 1].type == TYPE_ARRAY)
+			{
+				estack[esp + 1].value += 0x00010000l;
+				MemArray	*	ma = (MemArray *)(unsigned)estack[esp + 1].value;				
+				int index = estack[esp + 1].value >> 16;
+
+				if (index < ma->size)
+				{
+					valpush(TYPE_ARRAY_REF, estack[esp + 1].value);
+					valderef(0);
+					valassign();
+					callstack[csp].tk = tk;
+					callstack[csp].type = CSTACK_WHILE;
+					exectk = tk + 4;
+				}
+				else
+				{
+					esp += 2;
+					exectk = (char *)(etk[2] + (etk[3] << 8));
+				}
+			}
+			else
+			{
+				valinc(0x00010000l);
+				esp--;
+				estack[esp] = estack[esp + 1];
+				valderef(0);
+				int v = valpop() >> 16;
+				if (v <= (int)(estack[esp + 1].value & 0xffff))
+				{
+					callstack[csp].tk = tk;
+					callstack[csp].type = CSTACK_WHILE;
+					exectk = tk + 4;
+				}
+				else
+				{
+					esp += 2;
+					exectk = (char *)(etk[2] + (etk[3] << 8));
+				}
+			}
+
+			return true;
+		}
+
 	default:
 		tk += 2;
 	}
@@ -1655,6 +1705,50 @@ bool interpret_statement(void)
 				exectk = (char *)(etk[2] + (etk[3] << 8));
 			return true;
 
+		case STMT_FOR:
+		{
+			esp--;
+			estack[esp] = estack[esp + 1];
+
+			valderef(1);
+			char t = estack[esp + 1].type;
+			if (t == TYPE_ARRAY)
+			{
+				MemArray	*	ma = (MemArray *)(unsigned)estack[esp + 1].value;
+				if (ma->size == 0)
+				{
+					esp += 2;
+					exectk = (char *)(exectk[2] + (exectk[3] << 8));
+					return true;
+				}
+
+				valpush(TYPE_ARRAY_REF, estack[esp + 1].value);
+				valderef(0);
+			}
+			else if (t == TYPE_RANGE)
+			{
+				if ((int)(estack[esp + 1].value >> 16) > (int)estack[esp + 1].value)
+				{
+					esp += 2;
+					exectk = (char *)(exectk[2] + (exectk[3] << 8));
+					return true;
+				}
+
+				valpush(TYPE_NUMBER, estack[esp + 1].value & 0xffff0000l);
+			}
+			else
+			{
+				runtime_error = RERR_INVALID_TYPES;
+				return false;
+			}
+			valassign();
+
+			callstack[csp].tk = exectk;
+			callstack[csp].type = CSTACK_WHILE;
+			exectk += 4;
+
+			return true;
+		}
 		case STMT_IF:
 		case STMT_ELSIF:
 			if (boolpop())

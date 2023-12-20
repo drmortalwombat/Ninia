@@ -230,6 +230,10 @@ void prepare_statements(char * tk)
 				tk = prepare_expression(tk + 2, false);
 				pl++;
 				break;		
+			case STMT_FOR:
+				tk = prepare_expression(tk, true);
+				break;						
+			case STMT_NEXT:
 			case STMT_ELSE:
 				tk[0] = (unsigned)pt & 0xff;
 				tk[1] = (unsigned)pt >> 8;
@@ -412,6 +416,10 @@ void restore_statements(char * tk)
 				tk[1] = 0;
 				tk = restore_expression(tk + 2, false);
 				break;		
+			case STMT_FOR:
+				tk = restore_expression(tk, true);
+				break;						
+			case STMT_NEXT:
 			case STMT_ELSE:
 				tk[0] = 0;
 				tk[1] = 0;
@@ -510,6 +518,10 @@ char token_skip_statement(const char * tk)
 		case STMT_VAR:
 		case STMT_RETURN:
 			ti += token_skip_expression(tk + ti);
+			break;
+		case STMT_FOR:
+			ti += token_skip_expression(tk + ti);
+			ti += 4;
 			break;
 		case STMT_NONE:
 		case STMT_RETURN_NULL:
