@@ -7,6 +7,7 @@ extern char * starttk, * limittk;
 extern char cursorx, cursory, screenx;
 extern char * screentk, * cursortk, * endtk, * marktk, * blocktk;
 extern unsigned screeny;
+extern bool tkmodified;
 
 extern char	buffer[200], cbuffer[200];
 
@@ -16,7 +17,7 @@ const char * edit_display_line(char y, const char * tk);
 
 void edit_refresh_screen(void);
 
-void edit_show_status(void);
+__noinline void edit_show_status(void);
 
 void edit_scroll_up(void);
 
@@ -27,8 +28,10 @@ char edit_line(void);
 struct edit_cmd_t
 {
 	char	name[4];
-	char	cmd[16];
+	char	cmd[17];
 };
+
+__noinline void edit_restart(void);
 
 __noinline void edit_init(void);
 

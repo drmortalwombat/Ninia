@@ -32,7 +32,8 @@ char	filemask;
 
 #pragma bss( bss )
 
-const char * exectk, * execetk;
+__zeropage const char * exectk;
+const char * execetk;
 
 unsigned useed;
 
@@ -1465,7 +1466,7 @@ bool interpret_expression(void)
 					{
 						valderef(0);
 						valderef(1);
-						
+
 						unsigned long i1 = valpop() >> 16;
 						unsigned long i0 = valpop() >> 16;
 

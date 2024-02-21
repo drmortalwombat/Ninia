@@ -443,7 +443,11 @@ const char * format_statement(const char * tk, char * str, char * col)
 		}
 	}
 	else
-		str[0] = 0;
+	{
+		str[0] = 180;
+		col[0] = VCOL_DARK_GREY;
+		str[1] = 0;
+	}
 
 	return tk;
 }

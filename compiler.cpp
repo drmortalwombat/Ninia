@@ -2,6 +2,7 @@
 #include "compiler.h"
 #include "tokens.h"
 #include "runtime.h"
+#include "manager.h"
 
 #pragma code(tcode)
 #pragma data(tdata)
@@ -568,16 +569,63 @@ char * edit_line_to_token(unsigned y)
 }
 
 
+bool tokens_import(const char * name)
+{
+	char	xname[32];
+	strcpy(xname, "0:");
+	strcat(xname, name);
+	strcat(xname, ",P,R");
+
+	krnio_setnam(xname);
+	if (krnio_open(2, sysdrive, 2))
+	{				
+		edit_init();
+		krnio_chkin(2);
+
+		// Make space for new data
+		unsigned	esize = endtk - cursortk;
+		memcpy(limittk - esize, cursortk, esize);
+
+		char * tk = cursortk;
+		char status = krnio_status();
+		while (!status)
+		{
+			char i = 0;
+			while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
+			{
+				if (c >= 'A' && c <= 'Z')
+					c += p'A' - 'A';
+				else if (c >= 'a' && c <= 'z')
+					c -= 'a' - p'a';
+				if (c != 13)
+					buffer[i++] = c;
+			}
+			buffer[i] = 0;
+			tk = parse_statement((char *)buffer, tk);
+		}
+		krnio_clrchn();
+		krnio_close(2);
+
+		memcpy(tk, limittk - esize, esize);
+		endtk = tk + esize;
+
+		tkmodified = true;
+
+		return true;
+	}
+
+	return false;
+}
 
 bool tokens_load(const char * name)
 {
 	char	xname[32];
 	strcpy(xname, "0:");
 	strcat(xname, name);
-	strcat(xname, ".NIN,P,R");
+	strcat(xname, ",P,R");
 
 	krnio_setnam(xname);
-	if (krnio_open(2, 9, 2))
+	if (krnio_open(2, sysdrive, 2))
 	{				
 		edit_init();
 		krnio_chkin(2);
@@ -605,6 +653,8 @@ bool tokens_load(const char * name)
 		*tk++ = STMT_END;
 		endtk = tk;
 
+		tkmodified = false;
+
 		return true;
 	}
 
@@ -616,10 +666,10 @@ bool tokens_save(const char * name)
 	char	xname[32];
 	strcpy(xname, "@0:");
 	strcat(xname, name);
-	strcat(xname, ".NIN,P,W");
+	strcat(xname, ",P,W");
 
 	krnio_setnam(xname);
-	if (krnio_open(2, 9, 2))
+	if (krnio_open(2, sysdrive, 2))
 	{				
 		krnio_chkout(2);
 
@@ -643,6 +693,8 @@ bool tokens_save(const char * name)
 
 		krnio_clrchn();
 		krnio_close(2);
+
+		tkmodified = false;
 
 		return true;
 	}

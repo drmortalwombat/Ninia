@@ -11,23 +11,21 @@
 #include "system.h"
 #include "errors.h"
 #include "compiler.h"
+#include "manager.h"
 #include <conio.h>
 #include <c64/kernalio.h>
 #include <c64/memmap.h>
-
-edit_cmd_t	filename;
 
 #pragma code( mcode )
 
 void ninia_main(void)
 {
 	SYS_VCALL(symbols_init);
+	SYS_VCALL(manager_init);
 
 	SYS_VCALL(edit_init);
 
 	system_show_editor();
-
-	// "LOAD SAVE FIND ---- RUN- ---- ---- ---- ----";
 
 	for(;;)
 	{
@@ -74,7 +72,12 @@ void ninia_main(void)
 			if (SYS_RRCALL(edit_cmd, filename))
 			{
 				SYS_RPCALL(tokens_load, filename.cmd);
+				SYS_VCALL(edit_restart);
 			} break;
+		case PETSCII_F7:
+			SYS_VCALL(manager_invoke);
+			system_show_editor();
+			break;
 		}
 	}
 }

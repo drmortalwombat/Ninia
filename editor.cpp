@@ -48,6 +48,16 @@ void edit_init(void)
 	*endtk++ = STMT_NONE;
 	*endtk++ = STMT_END;
 	limittk = (char *)0x7000;
+	tkmodified = false;
+}
+
+void edit_restart(void)
+{
+	screentk = cursortk = starttk;
+	cursorx = 0;
+	cursory = 0;
+	screenx = 0;
+	screeny = 0;
 }
 
 const char * edit_display_line(char y, const char * tk)
@@ -259,6 +269,7 @@ char edit_line(void)
 						ecbuffer[i] = ecbuffer[i + 1];
 						i++;
 					}
+					tkmodified = true;
 					redraw = true;
 					ch = 0;
 				}
@@ -295,6 +306,7 @@ char edit_line(void)
 					ebuffer[i] = ch;
 					ecbuffer[i] = VCOL_WHITE;
 					cursorx++;
+					tkmodified = true;
 					redraw = true;
 				}
 				ch = 0;
@@ -457,6 +469,9 @@ void edit_show_status(void)
 		i++;		
 	}
 
+	if (tkmodified)
+		dp[34] = 128 + '*';
+
 	utoa(limittk - endtk, str, 10);
 	j = 0;
 	while (str[j])
@@ -529,6 +544,7 @@ char edit_text(void)
 					endtk -= 2;
 					cursortk = prevtk;
 					edit_refresh_screen();									
+					tkmodified = true;
 				}
 				else if (SYS_RPCALL(token_skip_statement, cursortk) == 2)
 				{
@@ -538,6 +554,7 @@ char edit_text(void)
 					edit_refresh_screen();
 					cursortk = prevtk;
 					cursorx = 255;
+					tkmodified = true;
 				}
 				else
 					cursory++;
@@ -549,6 +566,7 @@ char edit_text(void)
 				cursory++;
 				cursortk += SYS_RPCALL(token_skip_statement, cursortk);
 				cursorx = *cursortk - 1;
+				tkmodified = true;
 			}
 			break;
 		case S'Y':
@@ -561,6 +579,7 @@ char edit_text(void)
 				memmove(cursortk, nexttk, endtk - nexttk);
 				endtk -= len;
 				redraw = true;
+				tkmodified = true;
 			} 
 			break;
 		case S'X':
@@ -584,6 +603,7 @@ char edit_text(void)
 				else
 					cursory = line - screeny;
 				redraw = true;
+				tkmodified = true;
 			} 
 			break;
 		case S'V':
@@ -605,6 +625,7 @@ char edit_text(void)
 				else
 					cursory = line - screeny;
 				redraw = true;
+				tkmodified = true;
 			}
 			break;
 		case S'C':
@@ -614,6 +635,7 @@ char edit_text(void)
 				blocktk = limittk - sz;
 				memcpy(blocktk, marktk, sz);
 				marktk = nullptr;
+				tkmodified = true;
 			}
 			break;
 		case S'B':
@@ -630,6 +652,7 @@ char edit_text(void)
 		case PETSCII_F1:
 		case PETSCII_F2:
 		case PETSCII_F5:
+		case PETSCII_F7:
 			return ch;
 		}
 
@@ -643,14 +666,19 @@ char edit_text(void)
 		}
 		else if (cursory > 20)
 		{
-
 			edit_scroll_up();
 			cursory--;
 		}
 
 		cursortk = screentk;
 		for(char i=0; i<cursory; i++)
-			cursortk += SYS_RPCALL(token_skip_statement, cursortk);
+		{
+			char s = SYS_RPCALL(token_skip_statement, cursortk);
+			if (cursortk[s])
+				cursortk += s;
+			else
+				cursory = i;
+		}
 	}	
 }
 
@@ -666,7 +694,7 @@ bool edit_cmd(edit_cmd_t & ec)
 	dp[4] = s'[' | 0x80;
 	dp[17] = s']' | 0x80;
 
-	char cx = 12;
+	char cx = 16;
 	for(;;)
 	{
 		char n = 0;
@@ -676,7 +704,7 @@ bool edit_cmd(edit_cmd_t & ec)
 			n++;
 		}
 		char i = n;
-		while (i < 12)
+		while (i < 16)
 			ep[i++] = ' ' | 0x80;
 		if (cx > n)
 			cx = n;
@@ -715,10 +743,10 @@ bool edit_cmd(edit_cmd_t & ec)
 			break;
 		case PETSCII_RETURN:
 			return true;
-		case S'C':
+		case PETSCII_STOP:
 			return false;
 		default:
-			if (n < 12)
+			if (n < 16)
 			{
 				char i = n + 1;
 				while (i > cx)

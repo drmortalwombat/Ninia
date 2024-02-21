@@ -6,6 +6,7 @@
 #define	BANK_EDITOR		1
 #define BANK_RUNTIME	2
 #define BANK_TOKENS		3
+#define BANK_MANAGER	4
 
 // Common code bank for all elements, contains stuff named code
 #pragma region( cbank, 0xb000, 0xbffc, , {0, 1, 2, 3, 4, 5, 6}, { code, data } )
@@ -29,6 +30,10 @@
 #pragma section( tdata, 0 )
 #pragma region( tbank, 0x8000, 0xb000, , BANK_TOKENS, { tcode, tdata } )
 
+#pragma section( acode, 0 )
+#pragma section( adata, 0 )
+#pragma region( abank, 0x8000, 0xb000, , BANK_MANAGER, { acode, adata } )
+
 #pragma region( zeropage, 0xf7, 0x100, , , { zeropage } )
 
 static char * const Screen = (char *)0xcc00;
@@ -39,6 +44,9 @@ static char * const Color = (char *)0xd800;
 
 #pragma section( rtbss, 0, , , bss)
 #pragma region( rtbss , 0xc000, 0xd000, , , {rtbss} )
+
+#pragma section( managebss, 0, , , bss)
+#pragma region( managebss , 0xc000, 0xcc00, , , {managebss} )
 
 void system_show_editor(void);
 
