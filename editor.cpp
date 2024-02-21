@@ -692,7 +692,7 @@ bool edit_cmd(edit_cmd_t & ec)
 		dp[i] = p2s(ec.name[i]) | 0x80;
 
 	dp[4] = s'[' | 0x80;
-	dp[17] = s']' | 0x80;
+	dp[21] = s']' | 0x80;
 
 	char cx = 16;
 	for(;;)

@@ -190,6 +190,13 @@ void system_show_runtime(void)
 #pragma code( code )
 #pragma data( data )
 
+char system_bank_read(char back, char bank, volatile const char * p)
+{
+	eflash.bank = bank;
+	char c = *p;
+	eflash.bank = back;	
+	return c;
+}
 
 void system_putch(char ch)
 {

@@ -16,6 +16,8 @@ __noinline unsigned edit_token_to_line(const char * c);
 
 __noinline char * edit_line_to_token(unsigned y);
 
+__noinline bool tokens_import(const char * name);
+
 __noinline bool tokens_load(const char * name);
 
 __noinline bool tokens_save(const char * name);

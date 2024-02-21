@@ -108,7 +108,8 @@ const char manager_main_menu[] =
 	p"_Save\t"
 	p"_Import\t"
 	p"_Export\n"
-	p"_New\n"
+	p"_New\t"
+	p"_Build\n"
 	p"Dri_ve\t"
 	p"_Directory\t"
 	p"De_lete\t"
@@ -271,6 +272,86 @@ bool manager_are_you_sure(void)
 	}
 }
 
+__asm basicstart
+{
+	byt 0x01
+	byt 0x08
+	byt	0x0b
+	byt 0x08
+	byt	0x0a
+	byt	0x00
+	byt	0x9e
+	byt	'2'
+	byt	'0'
+	byt	'6'
+	byt	'1'
+	byt	0x00
+	byt	0x00
+	byt	0x00
+
+	lda #$36
+	sta $01
+
+	lda #$00
+	sta $0d
+	lda #$10
+	sta $0e
+	jsr interpret_init
+	jsr interpret_program
+	jsr interpret_reset
+
+	lda #$37
+	sta $01
+	rts
+}
+
+void manager_build(const char * name)
+{
+	manager_show_status(p"Building");
+
+	SYS_VPCALL(parse_pretty, starttk);
+	SYS_VPCALL(prepare_statements, starttk);
+
+	char	xname[32];
+	strcpy(xname, "@0:");
+	strcat(xname, name);
+	strcat(xname, ",P,W");
+
+	krnio_setnam(xname);
+	if (krnio_open(2, sysdrive, 2))
+	{				
+		krnio_chkout(2);
+
+		manager_show_status(p"Building Upstart");
+
+		for(char i=0; i<0x28; i++)
+			krnio_chrout(((char *)basicstart)[i]);
+
+		for(unsigned i=0x0827; i<0x1000; i++)
+			krnio_chrout(0x00);
+
+		manager_show_status(p"Building Program");
+
+		for(unsigned i=0x1000; i<0x8000; i++)
+			krnio_chrout(*(char *)i);
+
+		manager_show_status(p"Building Runtime");
+
+		for(unsigned i=0x8000; i<0xc000; i++)
+			krnio_chrout(SYS_BREAD(BANK_RUNTIME, (char *)i));
+
+		manager_show_status(p"Building Globals");
+
+		for(unsigned i=0xc000; i<0xd000; i++)
+			krnio_chrout(*(char *)i);
+
+		krnio_clrchn();
+		krnio_close(2);
+	}
+
+	SYS_VPCALL(restore_statements, starttk);
+}
+
 void manager_invoke(void)
 {
 	manager_cls();
@@ -310,6 +391,13 @@ void manager_invoke(void)
 			if (SYS_RRCALL(edit_cmd, filename))
 			{
 				SYS_RPCALL(tokens_save, filename.cmd);
+			}
+			break;
+		case p'b':
+			memcpy(impname.name, p"BULD", 4);
+			if (SYS_RRCALL(edit_cmd, impname))
+			{
+				manager_build(impname.cmd);
 			}
 			break;
 		case p'i':

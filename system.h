@@ -60,6 +60,8 @@ char system_getchx(void);
 
 char system_readch(void);
 
+char system_bank_read(char back, char bank, volatile const char * p);
+
 template<int back, class fn>
 __noinline void system_vcall(void)
 {
@@ -134,6 +136,8 @@ __noinline void system_vpcall(auto t)
 #define SYS_RPCALL3(fn, t, u, v) system_rpcall3<__bankof(""), fn>(t, u, v)
 
 #define SYS_RRCALL(fn, t) system_rrcall<__bankof(""), fn>(t)
+
+#define SYS_BREAD(b, p) system_bank_read(__bankof(""), b, p)
 
 
 #pragma compile("system.cpp")
