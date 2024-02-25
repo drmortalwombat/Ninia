@@ -136,7 +136,7 @@ void scroll_right(void)
 void edit_scroll_up(void)
 {
 	screeny++;
-	screentk += SYS_RPCALL(token_skip_statement, screentk);
+	screentk = SYS_RPCALL(token_skip_statement, screentk);
 
 	char * dp = Screen;
 	char * cp = Color;
@@ -208,6 +208,17 @@ char edit_line(void)
 
 	char upy = 24;
 	const char * uptk = screentk;
+
+	if (screenx > 0 && cursorx < screenx + 5)
+	{
+		if (cursorx > 5)
+			screenx = cursorx - 5;
+		else
+			screenx = 0;
+		upy = 0;
+		uptk = screentk;
+	}
+
 	for(;;)
 	{
 		dp[cursorx - screenx] |= 0x80;
@@ -419,7 +430,7 @@ char edit_line(void)
 			if (upy != cursory)
 				uptk = edit_display_line(upy, uptk);
 			else
-				uptk += SYS_RPCALL(token_skip_statement, uptk);
+				uptk = SYS_RPCALL(token_skip_statement, uptk);
 			upy++;
 		}
 	}
@@ -502,7 +513,17 @@ char edit_text(void)
 		redraw = false;
 
 		edit_show_status();
-		char ch = edit_line();
+		char ch;
+		if (cursortk[1] == STMT_FOLD)
+		{
+			char * dp = Screen + 40 * cursory;
+			dp[0] ^= 0x80;
+			ch = system_getch();
+			dp[0] ^= 0x80;
+		}
+		else
+			ch = edit_line();
+
 		switch (ch)
 		{
 		case PETSCII_CURSOR_DOWN:
@@ -533,11 +554,11 @@ char edit_text(void)
 				char i = 0;
 				while (i < cursory)
 				{
-					prevtk += SYS_RPCALL(token_skip_statement, prevtk);
+					prevtk = SYS_RPCALL(token_skip_statement, prevtk);
 					i++;
 				}
 
-				if (SYS_RPCALL(token_skip_statement, prevtk) == 2)
+				if (SYS_RPCALL(token_statement_size, prevtk) == 2)
 				{
 					// delete previous line
 					memmove(prevtk, cursortk, endtk - cursortk);
@@ -546,7 +567,7 @@ char edit_text(void)
 					edit_refresh_screen();									
 					tkmodified = true;
 				}
-				else if (SYS_RPCALL(token_skip_statement, cursortk) == 2)
+				else if (SYS_RPCALL(token_statement_size, cursortk) == 2)
 				{
 					// delete current line
 					memmove(cursortk, cursortk + 2, endtk - cursortk - 2);
@@ -564,7 +585,7 @@ char edit_text(void)
 			if (*cursortk)
 			{
 				cursory++;
-				cursortk += SYS_RPCALL(token_skip_statement, cursortk);
+				cursortk = SYS_RPCALL(token_skip_statement, cursortk);
 				cursorx = *cursortk - 1;
 				tkmodified = true;
 			}
@@ -574,7 +595,7 @@ char edit_text(void)
 			{
 				marktk = nullptr;
 
-				char len = SYS_RPCALL(token_skip_statement, cursortk);
+				unsigned len = SYS_RPCALL(token_statement_size, cursortk);
 				char * nexttk = cursortk + len;
 				memmove(cursortk, nexttk, endtk - nexttk);
 				endtk -= len;
@@ -650,6 +671,36 @@ char edit_text(void)
 			redraw = true;
 			break;
 		case PETSCII_F1:
+			if (cursortk[1] == STMT_FOLD)
+			{
+				endtk -= 4;
+				memmove(cursortk, cursortk + 4, endtk - cursortk);
+				redraw = true;
+				tkmodified = true;
+			}
+			else if (cursortk[1] != STMT_NONE)
+			{
+				char * foldtk = cursortk + 4;
+
+				memmove(foldtk, cursortk, endtk - cursortk);
+				endtk += 4;
+				
+				cursortk[1] = STMT_FOLD;
+				char l = foldtk[0];
+				while (foldtk[0])
+				{
+					foldtk = SYS_RPCALL(token_skip_statement, foldtk);
+					if (foldtk[0] <= l && foldtk[1] != STMT_NONE)
+						break;
+				}
+				unsigned	n = foldtk - cursortk - 2;
+				cursortk[2] = n & 0xff;
+				cursortk[3] = n >> 8;
+
+				redraw = true;
+				tkmodified = true;
+			}
+			break;
 		case PETSCII_F2:
 		case PETSCII_F5:
 		case PETSCII_F7:
@@ -673,9 +724,9 @@ char edit_text(void)
 		cursortk = screentk;
 		for(char i=0; i<cursory; i++)
 		{
-			char s = SYS_RPCALL(token_skip_statement, cursortk);
-			if (cursortk[s])
-				cursortk += s;
+			char * nexttk = SYS_RPCALL(token_skip_statement, cursortk);
+			if (nexttk[0])
+				cursortk = nexttk;
 			else
 				cursory = i;
 		}

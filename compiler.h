@@ -8,7 +8,11 @@ __noinline void prepare_statements(char * tk);
 
 __noinline void restore_statements(char * tk);
 
-__noinline char token_skip_statement(const char * tk);
+__noinline const char * token_skip_statement(const char * tk);
+
+__noinline char * token_skip_statement(char * tk);
+
+__noinline unsigned token_statement_size(const char * tk);
 
 __noinline char * edit_screen_to_token(char y);
 

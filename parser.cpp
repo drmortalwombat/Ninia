@@ -636,6 +636,6 @@ void parse_pretty(char * tk)
 			lmin = lmax = lmax + 1;
 			break;
 		}
-		tk += token_skip_statement(tk);		
+		tk = token_skip_statement(tk);		
 	}
 }

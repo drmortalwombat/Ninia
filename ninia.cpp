@@ -61,19 +61,6 @@ void ninia_main(void)
 					system_getch();
 				system_show_editor();
 			} break;
-		case PETSCII_F1:
-			memcpy(filename.name, p"SAVE", 4);
-			if (SYS_RRCALL(edit_cmd, filename))
-			{
-				SYS_RPCALL(tokens_save, filename.cmd);
-			} break;
-		case PETSCII_F2:
-			memcpy(filename.name, p"LOAD", 4);
-			if (SYS_RRCALL(edit_cmd, filename))
-			{
-				SYS_RPCALL(tokens_load, filename.cmd);
-				SYS_VCALL(edit_restart);
-			} break;
 		case PETSCII_F7:
 			SYS_VCALL(manager_invoke);
 			system_show_editor();

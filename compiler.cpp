@@ -245,6 +245,9 @@ void prepare_statements(char * tk)
 			case STMT_COMMENT:
 				tk += tk[0] + 1;
 				break;
+			case STMT_FOLD:
+				tk += 2;
+				break;
 			}
 		}
 		l = *tk;
@@ -434,6 +437,9 @@ void restore_statements(char * tk)
 			case STMT_COMMENT:
 				tk += tk[0] + 1;
 				break;
+			case STMT_FOLD:
+				tk += 2;
+				break;
 			}
 		}
 		l = *tk;
@@ -496,9 +502,9 @@ char token_skip_expression(const char * tk)
 	return ti + 1;
 }
 
-char token_skip_statement(const char * tk)
+unsigned token_statement_size(const char * tk)
 {
-	char ti = 0;
+	unsigned ti = 0;
 	if (tk[0])
 	{
 		ti++;
@@ -533,17 +539,31 @@ char token_skip_statement(const char * tk)
 		case STMT_COMMENT:
 			ti += tk[ti] + 1;
 			break;
+		case STMT_FOLD:
+			ti += tk[ti] + 256 * tk[ti + 1];
+			break;
 		}
 	}
 
 	return ti;	
 }
 
+const char * token_skip_statement(const char * tk)
+{	
+	return tk + token_statement_size(tk);
+}
+
+char * token_skip_statement(char * tk)
+{
+	return tk + token_statement_size(tk);
+}
+
+
 char * edit_screen_to_token(char y)
 {
 	char * tk = screentk;
 	for(char i=0; i<y; i++)
-		tk += token_skip_statement(tk);
+		tk = token_skip_statement(tk);
 	return tk;
 }
 
@@ -553,7 +573,7 @@ unsigned edit_token_to_line(const char * ct)
 	unsigned line = 0;
 	while (*tk && tk <= ct)
 	{
-		tk += token_skip_statement(tk);
+		tk = token_skip_statement(tk);
 		line++;
 	}
 
@@ -564,7 +584,61 @@ char * edit_line_to_token(unsigned y)
 {
 	char * tk = starttk;
 	for(unsigned i=0; i<y; i++)
-		tk += token_skip_statement(tk);
+		tk = token_skip_statement(tk);
+	return tk;
+}
+
+char * tokens_file_load(char * tk)
+{
+	krnio_chkin(2);
+
+	char * foldtk = nullptr;
+
+	char status = krnio_status();
+	while (!status)
+	{
+		char i = 0;
+		bool fold = false;
+		while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
+		{
+			if (c == 187)
+				fold = true;
+			else if (c == 13)
+				;
+			else
+			{
+				if (c >= 'A' && c <= 'Z')
+					c += p'A' - 'A';
+				else if (c >= 'a' && c <= 'z')
+					c -= 'a' - p'a';
+				buffer[i++] = c;
+			}
+		}
+
+		buffer[i] = 0;
+		if (fold)
+		{
+			foldtk = tk;
+			tk += 4;
+		}
+		char * ntk = parse_statement((char *)buffer, tk);			
+		if (fold)
+		{
+			foldtk[0] = tk[0];
+			foldtk[1] = STMT_FOLD;				
+		}
+		else if (foldtk && foldtk[0] >= tk[0])
+		{
+			unsigned d = ntk - foldtk - 2;
+			foldtk[2] = d & 0xff;
+			foldtk[3] = d >> 8;
+			foldtk = nullptr;
+		}
+		tk = ntk;
+	}
+	krnio_clrchn();
+	krnio_close(2);
+
 	return tk;
 }
 
@@ -579,34 +653,13 @@ bool tokens_import(const char * name)
 	krnio_setnam(xname);
 	if (krnio_open(2, sysdrive, 2))
 	{				
-		edit_init();
-		krnio_chkin(2);
-
 		// Make space for new data
 		unsigned	esize = endtk - cursortk;
-		memcpy(limittk - esize, cursortk, esize);
+		memmove(limittk - esize, cursortk, esize);
 
-		char * tk = cursortk;
-		char status = krnio_status();
-		while (!status)
-		{
-			char i = 0;
-			while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
-			{
-				if (c >= 'A' && c <= 'Z')
-					c += p'A' - 'A';
-				else if (c >= 'a' && c <= 'z')
-					c -= 'a' - p'a';
-				if (c != 13)
-					buffer[i++] = c;
-			}
-			buffer[i] = 0;
-			tk = parse_statement((char *)buffer, tk);
-		}
-		krnio_clrchn();
-		krnio_close(2);
+		char * tk = tokens_file_load(cursortk);
 
-		memcpy(tk, limittk - esize, esize);
+		memmove(tk, limittk - esize, esize);
 		endtk = tk + esize;
 
 		tkmodified = true;
@@ -628,34 +681,18 @@ bool tokens_load(const char * name)
 	if (krnio_open(2, sysdrive, 2))
 	{				
 		edit_init();
-		krnio_chkin(2);
 
-		char * tk = starttk;
-		char status = krnio_status();
-		while (!status)
+		char * tk = tokens_file_load(starttk);
+
+		if (tk != starttk)
 		{
-			char i = 0;
-			while ((char c = krnio_chrin()) != 10 && !(status = krnio_status()))
-			{
-				if (c >= 'A' && c <= 'Z')
-					c += p'A' - 'A';
-				else if (c >= 'a' && c <= 'z')
-					c -= 'a' - p'a';
-				if (c != 13)
-					buffer[i++] = c;
-			}
-			buffer[i] = 0;
-			tk = parse_statement((char *)buffer, tk);
+			*tk++ = STMT_END;
+			endtk = tk;
+
+			tkmodified = false;
+
+			return true;
 		}
-		krnio_clrchn();
-		krnio_close(2);
-
-		*tk++ = STMT_END;
-		endtk = tk;
-
-		tkmodified = false;
-
-		return true;
 	}
 
 	return false;
@@ -676,6 +713,12 @@ bool tokens_save(const char * name)
 		const char * tk = starttk;
 		while (*tk)
 		{
+			if (tk[1] == STMT_FOLD)
+			{
+				krnio_chrout(187);
+				tk += 4;
+			}
+
 			tk = format_statement(tk, buffer, cbuffer);
 
 			char i =0 ;

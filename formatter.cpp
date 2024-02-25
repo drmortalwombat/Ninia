@@ -1,5 +1,7 @@
 #include "formatter.h"
 #include "tokens.h"
+#include "system.h"
+#include "compiler.h"
 #include <c64/vic.h>
 
 #pragma code( tcode )
@@ -82,7 +84,7 @@ const char assign_names[][2] = {
 	"=", "+=", "-="
 };
 
-const char hex_chars[16] = "0123456789abcdef";
+const char hex_chars[16] = p"0123456789abcdef";
 
 const char * format_expression(const char * tk, char * str, char * color, char si)
 {
@@ -367,7 +369,23 @@ const char * format_statement(const char * tk, char * str, char * col)
 			col[i] = VCOL_DARK_GREY;
 		}
 
+		const char *	ftk = nullptr;
+
 		char t = *tk++;
+		if (t == STMT_FOLD)
+		{
+			if (l == 0)
+				l++;
+			str[0] = 171 ;
+			col[0] = VCOL_LT_GREY;
+
+			ftk = tk + (tk[0] + 256 * tk[1]);
+
+			// skip header byte of next command
+			tk += 3;
+			t = *tk++;			
+		}
+
 		switch (t)
 		{
 		case STMT_COMMENT:
@@ -387,47 +405,56 @@ const char * format_statement(const char * tk, char * str, char * col)
 				str[l] = 0;
 			} break;			
 		case STMT_EXPRESSION:
-			return format_expression(tk, str, col, l);
+			tk = format_expression(tk, str, col, l);
+			break;
 		case STMT_WHILE:
 			l = format_append(str, col, l, VCOL_WHITE, p"WHILE ");
-			return format_expression(tk + 2, str, col, l);
+			tk = format_expression(tk + 2, str, col, l);
+			break;
 		case STMT_FOR:
 			l = format_append(str, col, l, VCOL_WHITE, p"FOR ");
-			return format_expression(tk, str, col, l) + 4;
+			tk = format_expression(tk, str, col, l) + 4;
+			break;
 		case STMT_IF:
 			l = format_append(str, col, l, VCOL_WHITE, p"IF ");
-			return format_expression(tk + 2, str, col, l);
+			tk = format_expression(tk + 2, str, col, l);
+			break;
 		case STMT_ELSIF:
 			l = format_append(str, col, l, VCOL_WHITE, p"ELSIF ");
-			return format_expression(tk + 2, str, col, l);
+			tk = format_expression(tk + 2, str, col, l);
+			break;
 		case STMT_ELSE:
 			l = format_append(str, col, l, VCOL_WHITE, p"ELSE");
 			str[l] = 0;
-			return tk + 2;
+			tk += 2;
+			break;
 		case STMT_VAR:
 			l = format_append(str, col, l, VCOL_WHITE, p"VAR ");
-			return format_expression(tk, str, col, l);
+			tk = format_expression(tk, str, col, l);
+			break;
 		case STMT_RETURN:
 			l = format_append(str, col, l, VCOL_WHITE, p"RETURN ");
-			return format_expression(tk, str, col, l);
+			tk = format_expression(tk, str, col, l);
+			break;
 		case STMT_BREAK:
 			l = format_append(str, col, l, VCOL_WHITE, p"BREAK");
 			str[l] = 0;
-			return tk;
+			break;
 		case STMT_EXIT:
 			l = format_append(str, col, l, VCOL_WHITE, p"EXIT");
 			str[l] = 0;
-			return tk;
+			break;
 		case STMT_RETURN_NULL:
 			l = format_append(str, col, l, VCOL_WHITE, p"RETURN");
 			str[l] = 0;
-			return tk;
+			break;
 		case STMT_DEF:
 			l = format_append(str, col, l, VCOL_WHITE, p"DEF ");
-			return format_expression(tk + 2, str, col, l);
+			tk = format_expression(tk + 2, str, col, l);
+			break;
 		case STMT_NONE:
 			str[l] = 0;
-			return tk;
+			break;
 		case STMT_ERROR:
 			{
 				char n = *tk++;
@@ -441,6 +468,10 @@ const char * format_statement(const char * tk, char * str, char * col)
 				str[l] = 0;
 			} break;
 		}
+
+		// now skip folded section
+		if (ftk)
+			tk = ftk;
 	}
 	else
 	{

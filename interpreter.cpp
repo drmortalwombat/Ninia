@@ -82,6 +82,7 @@ char struct_index(MemDict * md, unsigned sym)
 	return 0xff;
 }
 
+
 void valderef(char at)
 {
 	char ei = esp + at;
@@ -407,12 +408,14 @@ void interpret_builtin(char n)
 		return;
 	}
 
+	for(char i=0; i<n; i++)
+		valderef(i);
+
 	switch ((char)lf)
 	{
 	case RTSYM_ABS:
 		if (n == 1)
 		{
-			valderef(0);
 			long li = valpop();
 			esp += 1;
 			valpush(TYPE_NUMBER, labs(li));
@@ -422,10 +425,7 @@ void interpret_builtin(char n)
 		break;
 	case RTSYM_CHROUT:
 		for(char i=0; i<n; i++)
-		{
-			valderef(n - i - 1);
 			system_putch(valget(n - i - 1) >> 16);
-		} 
 		esp += n + 1;
 		valpush(TYPE_NULL, 0);
 		break;
@@ -474,7 +474,6 @@ void interpret_builtin(char n)
 		for(char i=0; i<n; i++)
 		{
 			char k = n - i - 1;
-			valderef(k);
 			switch (typeget(k) & TYPE_MASK)
 			{
 			case TYPE_NUMBER:
@@ -503,12 +502,22 @@ void interpret_builtin(char n)
 		for(char i=0; i<n; i+=2)
 		{
 			char k = n - i - 1;
-			valderef(k);
-			valderef(k-1);
-
 			volatile char * lp = (char *)((unsigned long)valget(k) >> 16);
-			char v = (unsigned long)valget(k-1) >> 16;
-			*lp = v;
+			switch (typeget(k-1) & TYPE_MASK)
+			{
+			case TYPE_NUMBER:
+				{
+					char v = (unsigned long)valget(k-1) >> 16;
+					*lp = v;
+				} break;
+			case TYPE_STRING:
+				{
+					const char * str = valstring(k-1, tmp1);
+					char n = str[0];
+					for(char i=0; i<n; i++)
+						lp[i] = str[i + 1];
+				} break;
+			}
 		}
 		esp += n + 1;
 		valpush(TYPE_NULL, 0);
@@ -517,7 +526,6 @@ void interpret_builtin(char n)
 	case RTSYM_PEEK:
 		if (n == 1)
 		{
-			valderef(0);
 			volatile char * lp = (char *)((unsigned long)valpop() >> 16);
 			esp += 1;
 			valpush(TYPE_NUMBER, (long)*lp << 16);
@@ -530,7 +538,6 @@ void interpret_builtin(char n)
 		for(char i=0; i<n; i++)
 		{
 			char k = n - i - 1;
-			valderef(k);
 			tmp[i] = valget(n - i - 1) >> 16;
 		}
 		esp += n + 1;
@@ -540,7 +547,6 @@ void interpret_builtin(char n)
 	case RTSYM_ARRAY:
 		if (n == 1)
 		{
-			valderef(0);
 			int m = valpop() >> 16;
 			MemArray	*	ma = array_allocate(0, m);
 			if (ma)
@@ -558,7 +564,6 @@ void interpret_builtin(char n)
 		if (n > 1)
 		{
 			char k = n - 1;
-			valderef(k);
 			MemArray	*	ma;
 			char t = typeget(k);
 			if (t == TYPE_ARRAY)
@@ -573,10 +578,8 @@ void interpret_builtin(char n)
 				char			ei = esp + k - 1;
 
 				for(char i=0; i<k; i++)
-				{
-					valderef(k - i - 1);
 					*vp++ = estack[ei--];
-				}
+
 				ma->size += k;
 				esp += n + 1;
 				valpush(TYPE_ARRAY, (unsigned)ma);
@@ -589,8 +592,6 @@ void interpret_builtin(char n)
 	case RTSYM_SHIFT:
 		if (n == 1)
 		{
-			valderef(0);
-
 			MemArray * ma = (MemArray *)valmem(0);
 			MemValues * mv = (MemValues *)ma->mh;
 
@@ -611,8 +612,6 @@ void interpret_builtin(char n)
 	case RTSYM_POP:
 		if (n == 1)
 		{
-			valderef(0);
-
 			MemArray * ma = (MemArray *)valmem(0);
 			MemValues * mv = (MemValues *)ma->mh;
 
@@ -633,7 +632,6 @@ void interpret_builtin(char n)
 			for(char i=0; i<n; i++)
 			{
 				char k = n - i - 1;
-				valderef(k);
 				const char * str = valstring(k, tmp1);
 				t += str[0];
 			}
@@ -661,7 +659,6 @@ void interpret_builtin(char n)
 	case RTSYM_ASC:
 		if (n == 1)
 		{
-			valderef(0);
 			const char * str = valstring(0, tmp1);
 			esp += 2;
 			valpush(TYPE_NUMBER, str[0] > 0 ? (unsigned long)str[1] << 16 : 0);
@@ -673,7 +670,6 @@ void interpret_builtin(char n)
 	case RTSYM_VAL:
 		if (n == 1)
 		{
-			valderef(0);
 			const char * str = valstring(0, tmp1);
 
 			long l;
@@ -689,7 +685,6 @@ void interpret_builtin(char n)
 	case RTSYM_STR:
 		if (n == 1)
 		{
-			valderef(0);
 			char t = typeget(0);
 			if ((t & TYPE_MASK) == TYPE_STRING)
 			{
@@ -711,7 +706,6 @@ void interpret_builtin(char n)
 	case RTSYM_FLOOR:
 		if (n == 1)
 		{
-			valderef(0);
 			long li = valpop() & 0xffff0000ul;
 			esp += 1;
 			valpush(TYPE_NUMBER, li);
@@ -723,7 +717,6 @@ void interpret_builtin(char n)
 	case RTSYM_CEIL:
 		if (n == 1)
 		{
-			valderef(0);
 			long li = (valpop() + 0xffff) & 0xffff0000ul;
 			esp += 1;
 			valpush(TYPE_NUMBER, li);
@@ -737,13 +730,8 @@ void interpret_builtin(char n)
 		{
 			int start = 0;
 			if (n > 2)
-			{
-				valderef(n - 3);
 				start = valget(n - 3) >> 16;
-			}
 
-			valderef(n - 1);
-			valderef(n - 2);
 			char t = typeget(n - 1);
 			if ((t & TYPE_MASK) == TYPE_STRING)
 			{
@@ -780,9 +768,6 @@ void interpret_builtin(char n)
 	case RTSYM_FOPEN:
 		if (n == 3)
 		{
-			valderef(2);
-			valderef(1);
-			valderef(0);
 			if (typeget(2) == TYPE_NUMBER && typeget(1) == TYPE_NUMBER && (typeget(0) & TYPE_MASK) == TYPE_STRING)
 			{
 
@@ -823,7 +808,6 @@ void interpret_builtin(char n)
 	case RTSYM_FCLOSE:
 		if (n == 1)
 		{
-			valderef(0);
 			if (typeget(0) == TYPE_NUMBER)
 			{
 				char fid = valget(0) >> 16;
@@ -845,7 +829,6 @@ void interpret_builtin(char n)
 	case RTSYM_FGET:
 		if (n >= 1)
 		{
-			valderef(n - 1);
 			if (typeget(n - 1) == TYPE_NUMBER)
 			{
 				char fid = valget(n - 1) >> 16;
@@ -855,7 +838,6 @@ void interpret_builtin(char n)
 				tmp2[0] = 0;
 				if (n >= 2)
 				{
-					valderef(n - 2);
 					if (typeget(n - 2) == TYPE_NUMBER)
 					{
 						limit  = valget(n - 2) >> 16;
@@ -909,8 +891,6 @@ void interpret_builtin(char n)
 	case RTSYM_FPUT:
 		if (n == 2)
 		{
-			valderef(n - 1);
-			valderef(n - 2);
 			if (typeget(n - 1) == TYPE_NUMBER && (typeget(n - 2) & TYPE_MASK) == TYPE_STRING)
 			{
 				char fid = valget(n - 1) >> 16;
@@ -938,7 +918,6 @@ void interpret_builtin(char n)
 	case RTSYM_FEOF:
 		if (n == 1)
 		{
-			valderef(0);
 			if (typeget(0) == TYPE_NUMBER)
 			{
 				char fid = valget(0) >> 16;
@@ -959,11 +938,6 @@ void interpret_builtin(char n)
 	case RTSYM_CPUT:
 		if (n == 4)
 		{
-			valderef(0);
-			valderef(1);
-			valderef(2);
-			valderef(3);
-
 			int x = valget(3) >> 16, y = valget(2) >> 16;
 			char ch = valget(1) >> 16, co = valget(0) >> 16;
 
@@ -983,9 +957,6 @@ void interpret_builtin(char n)
 	case RTSYM_CGET:
 		if (n == 2)
 		{
-			valderef(0);
-			valderef(1);
-
 			int x = valget(1) >> 16, y = valget(0) >> 16;
 			char ch = 0;
 
@@ -1004,9 +975,6 @@ void interpret_builtin(char n)
 	case RTSYM_CFILL:
 		if (n == 6)
 		{
-			for(char i=0; i<6; i++)
-				valderef(i);
-
 			int x0 = valget(5) >> 16, y0 = valget(4) >> 16;
 			int x1 = x0 + (valget(3) >> 16), y1 = y0 + (valget(2) >> 16);
 			char ch = valget(1) >> 16, co = valget(0) >> 16;
@@ -1198,6 +1166,7 @@ bool interpret_expression(void)
 				else
 					runtime_error = RERR_INVALID_TYPES;
 			}	break;
+
 		case TK_RELATIONAL:
 			{
 				valderef(0); 
@@ -1246,6 +1215,7 @@ bool interpret_expression(void)
 
 				valpush(TYPE_NUMBER, (cmp & cmpmask[t & 0x0f]) ? 0xffff0000ul : 0ul);
 			} break;
+
 		case TK_PREFIX:
 			switch (t)
 			{
@@ -1385,6 +1355,7 @@ bool interpret_expression(void)
 					else
 						runtime_error = RERR_INVALID_TYPES;					
 				}	break;
+
 			case TK_INVOKE:
 				{
 					char n = tk[ti++];
@@ -1607,6 +1578,9 @@ bool interpret_statement(void)
 		break;
 	case STMT_COMMENT:
 		exectk = tk + tk[2] + 3;
+		return true;
+	case STMT_FOLD:
+		exectk = tk + 4;
 		return true;
 	case STMT_NEXT:
 		{

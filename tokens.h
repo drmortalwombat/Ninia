@@ -85,6 +85,7 @@
 #define STMT_ERROR			0x01
 #define STMT_NONE			0x02
 #define STMT_COMMENT		0x03
+#define STMT_FOLD			0x04
 
 #define STMT_EXPRESSION		0x10
 #define STMT_VAR			0x11

@@ -373,6 +373,7 @@ void manager_invoke(void)
 			{
 				filename.cmd[0] = 0;
 				SYS_VCALL(edit_init);				
+				return;
 			}
 			break;
 		case p'l':
@@ -383,6 +384,7 @@ void manager_invoke(void)
 				{
 					SYS_RPCALL(tokens_load, filename.cmd);
 					SYS_VCALL(edit_restart);
+					return;
 				} 
 			}
 			break;
@@ -391,6 +393,7 @@ void manager_invoke(void)
 			if (SYS_RRCALL(edit_cmd, filename))
 			{
 				SYS_RPCALL(tokens_save, filename.cmd);
+				return;
 			}
 			break;
 		case p'b':
@@ -398,6 +401,7 @@ void manager_invoke(void)
 			if (SYS_RRCALL(edit_cmd, impname))
 			{
 				manager_build(impname.cmd);
+				return;
 			}
 			break;
 		case p'i':
@@ -406,6 +410,7 @@ void manager_invoke(void)
 			if (SYS_RRCALL(edit_cmd, impname))
 			{
 				SYS_RPCALL(tokens_import, impname.cmd);
+				return;
 			}
 			break;
 		case p'd':
@@ -415,6 +420,8 @@ void manager_invoke(void)
 			sysdrive = sysdrive ^ 1;
 			manager_reset_dir();
 			break;
+		case p'r':
+			return;
 		}
 	}
 }

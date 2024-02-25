@@ -141,6 +141,16 @@ static FontPatch fontpatch[] = {
 		0b00000000,
 		0b00010000,
 		0b00000000}			
+	},{
+		107, {
+		0b11000000,
+		0b11100000,
+		0b11110000,
+		0b11111000,
+		0b11110000,
+		0b11100000,
+		0b11000000,
+		0b00000000}
 	}
 };
 
@@ -152,7 +162,7 @@ void system_show_editor(void)
 	}
 	mmap_set(MMAP_ALL_ROM);
 	memcpy(Font, Font + 0x0800, 0x0800);
-	for(char i=0; i<7; i++)
+	for(char i=0; i<8; i++)
 	{
 		char * dp0 = Font + 8 * fontpatch[i].c;
 		char * dp1 = dp0 + 0x0400;
