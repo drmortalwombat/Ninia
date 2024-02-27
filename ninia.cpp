@@ -51,6 +51,7 @@ void ninia_main(void)
 					cursortk = SYS_RPCALL(edit_line_to_token, line);
 					if (line < screeny || line > screeny + 24)
 					{
+						screentk = cursortk;
 						screeny = line;
 						cursory = 0;
 					}

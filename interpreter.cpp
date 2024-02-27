@@ -82,46 +82,8 @@ char struct_index(MemDict * md, unsigned sym)
 	return 0xff;
 }
 
-
-void valderef(char at)
-{
-	char ei = esp + at;
-	__assume(ei < VALUE_STACK_SIZE);
-	if (estack[ei].type & TYPE_REF)
-	{
-		switch (estack[ei].type)
-		{
-		case TYPE_GLOBAL_REF:
-			estack[ei] = globals[(char)(estack[ei].value)];
-			break;
-		case TYPE_LOCAL_REF:
-			estack[ei] = estack[(char)(efp - estack[ei].value)];
-			break;
-		case TYPE_ARRAY_REF:
-			{
-				MemArray	*	ma = (MemArray *)(unsigned)estack[ei].value;
-				MemValues	*	mv = (MemValues *)ma->mh;
-				unsigned		mi = estack[ei].value >> 16;
-				estack[ei] = mv->values[mi];
-			} break;
-		case TYPE_STRUCT_REF:
-			{
-				MemDict		*	md = (MemDict *)(unsigned)estack[ei].value;
-				MemValues	*	mv = (MemValues *)md->mh;
-				unsigned		ms = estack[ei].value >> 16;
-				char			mi = struct_index(md, ms);
-				if (mi != 0xff)
-					estack[ei] = mv->values[mi];
-				else
-					estack[ei].type = TYPE_NULL;
-			} break;
-		}
-	}
-}
-
 bool boolpop(void)
 {
-	valderef(0);
 	return estack[esp++].value != 0;
 }
 
@@ -145,6 +107,12 @@ inline char typeget(char at)
 {
 	char ei = esp + at;
 	return estack[ei].type;
+}
+
+inline void valput(char type, long value)
+{
+	estack[esp].type = type;
+	estack[esp].value = value;	
 }
 
 void valpush(char type, long value)
@@ -407,9 +375,6 @@ void interpret_builtin(char n)
 		runtime_error = RERR_UNDEFINED_SYMBOL;
 		return;
 	}
-
-	for(char i=0; i<n; i++)
-		valderef(i);
 
 	switch ((char)lf)
 	{
@@ -1064,7 +1029,7 @@ bool interpret_expression(void)
 		if (runtime_error)
 			return false;
 
-		char 	t = tk[ti++];
+		char 	t = exectk[ti++];
 		switch (t & 0xf0)
 		{
 		case TK_TINY_INT:
@@ -1087,28 +1052,41 @@ bool interpret_expression(void)
 
 		case TK_IDENT:
 			{
-				unsigned tv = ((t & 0x0f) << 8) | tk[ti++];
+				unsigned tv = ((t & 0x03) << 8) | tk[ti++];
 				valpush(TYPE_SYMBOL, tv);
 			} break;
 		case TK_CONST:	
 			break;
 		case TK_LOCAL:
 			{
-				unsigned tv = ((t & 0x0f) << 8) | tk[ti++];
-				valpush(TYPE_LOCAL_REF, tv);
+				unsigned tv = ((t & 0x03) << 8) | tk[ti++];
+				if (t & 0x08)
+					valpush(TYPE_LOCAL_REF, tv);
+				else if (esp == 0)
+					runtime_error = RERR_STACK_UNDERFLOW;
+				else
+				{
+					esp--;
+					estack[esp] = estack[(char)(efp - tv)];
+				}
 			} break;
 
 		case TK_GLOBAL:	
 			{
-				unsigned tv = ((t & 0x0f) << 8) | tk[ti++];
-				valpush(TYPE_GLOBAL_REF, tv);
+				unsigned tv = ((t & 0x03) << 8) | tk[ti++];
+				if (t & 0x08)
+					valpush(TYPE_GLOBAL_REF, tv);
+				else if (esp == 0)
+					runtime_error = RERR_STACK_UNDERFLOW;
+				else
+				{
+					esp--;
+					estack[esp] = globals[(char)tv];
+				}
 			} break;
 
 		case TK_BINARY:
 			{
-				valderef(0); 
-				valderef(1);
-
 				char tm = typeget(0) | typeget(1);
 				if (tm == TYPE_NUMBER)
 				{
@@ -1169,9 +1147,6 @@ bool interpret_expression(void)
 
 		case TK_RELATIONAL:
 			{
-				valderef(0); 
-				valderef(1);
-
 				// GT EQ LT
 				char cmp = 1;
 
@@ -1220,47 +1195,33 @@ bool interpret_expression(void)
 			switch (t)
 			{
 			case TK_NEGATE:
-				valderef(0); 
-				valpush(TYPE_NUMBER, -valpop());
+				valput(TYPE_NUMBER, -valtop());
 				break;
 			case TK_NOT:
 				{
-					valderef(0); 
 					char t = typeget(0);
 					if (t == TYPE_NUMBER)
-						valpush(TYPE_NUMBER, valpop() & 0xffff0000ul ^ 0xffff0000ul);
+						valput(TYPE_NUMBER, valtop() & 0xffff0000ul ^ 0xffff0000ul);
 					else if (t == TYPE_NULL)
-					{
-						esp++;
-						valpush(TYPE_NUMBER, -1l << 16);
-					}
+						valput(TYPE_NUMBER, -1l << 16);
 					else
-					{
-						esp++;
-						valpush(TYPE_NUMBER, 0);
-					}
+						valput(TYPE_NUMBER, 0);
 				}	break;
 			case TK_LENGTH:
 				{
-					valderef(0);
 					char t = typeget(0);
 					if ((t & TYPE_MASK) == TYPE_STRING)
 					{
 						const char * str = valstring(0, tmp1);
-						esp ++;
-						valpush(TYPE_NUMBER, (unsigned long)str[0] << 16);
+						valput(TYPE_NUMBER, (unsigned long)str[0] << 16);
 					}
 					else if (t == TYPE_ARRAY)
 					{
 						MemArray * ma = (MemArray *)valmem(0);
-						esp ++;
-						valpush(TYPE_NUMBER, (unsigned long)ma->size << 16);
+						valput(TYPE_NUMBER, (unsigned long)ma->size << 16);
 					}
 					else
-					{
-						esp ++;
-						valpush(TYPE_NUMBER, 0);
-					}
+						valput(TYPE_NUMBER, 0);
 
 				} break;
 			default:
@@ -1271,21 +1232,38 @@ bool interpret_expression(void)
 		case TK_POSTFIX:
 			switch (t)
 			{
+			case TK_LINDEX:
+				{
+					char n = tk[ti++];
+
+					char et = typeget(0);
+					long ei = valpop();
+					char t = typeget(0);
+					if (t == TYPE_ARRAY && et == TYPE_NUMBER)
+					{
+						estack[esp].type = TYPE_ARRAY_REF;
+						estack[esp].value |= ei & 0xffff0000ul;
+					}
+					else
+						runtime_error = RERR_INVALID_TYPES;					
+
+				} break;
+
 			case TK_INDEX:
 				{
 					char n = tk[ti++];
 
-					valderef(0);
 					char et = typeget(0);
 					long ei = valpop();
-					valderef(0);
 					char t = typeget(0);
 					if (t == TYPE_ARRAY)
 					{
 						if (et == TYPE_NUMBER)
 						{
-							estack[esp].type = TYPE_ARRAY_REF;
-							estack[esp].value |= ei & 0xffff0000ul;
+							MemArray * ma = (MemArray *)valmem(0);
+							MemValues	*	mv = (MemValues *)ma->mh;
+							unsigned		mi = ei >> 16;
+							estack[esp] = mv->values[mi];
 						}
 						else if (et == TYPE_RANGE)
 						{
@@ -1360,7 +1338,6 @@ bool interpret_expression(void)
 				{
 					char n = tk[ti++];
 
-					valderef(n); 
 					switch (typeget(n))
 					{
 					case TYPE_SYMBOL:
@@ -1379,8 +1356,6 @@ bool interpret_expression(void)
 							exectk = (char *)valget(n);
 							char k = exectk[1];
 							
-							for(char i=0; i<n; i++)
-								valderef(i);
 							while (n < k)
 							{
 								valpush(TYPE_NULL, 0);
@@ -1397,7 +1372,6 @@ bool interpret_expression(void)
 
 		case TK_ASSIGN:
 			{
-				valderef(0);
 				switch (t)
 				{
 				case TK_ASSIGN:
@@ -1426,22 +1400,36 @@ bool interpret_expression(void)
 					break;
 				case TK_COLON:
 					break;
-				case TK_DOT:
-					valderef(0);
-					unsigned long ei = valpop();
-					valderef(0);
-					estack[esp].type = TYPE_STRUCT_REF;
-					estack[esp].value |= ei << 16;
+				case TK_NULL:
+					valpush(TYPE_NULL, 0);
 					break;
+				case TK_LDOT:
+					{
+						unsigned long i1 = valpop();
+						unsigned long i0 = valtop();
+
+						valput(TYPE_STRUCT_REF, (i0 & 0x0000fffful) | (i1 << 16));
+					}	break;
+					break;
+				case TK_DOT:
+					{
+						unsigned long ei = valpop();
+
+						MemDict		*	md = (MemDict *)(unsigned)estack[esp].value;
+						MemValues	*	mv = (MemValues *)md->mh;
+						unsigned		ms = ei;
+						char			mi = struct_index(md, ms);
+						if (mi != 0xff)
+							estack[esp] = mv->values[mi];
+						else
+							estack[esp].type = TYPE_NULL;
+					} break;
 				case TK_DOTDOT:
 					{
-						valderef(0);
-						valderef(1);
+						unsigned long i1 = valpop();
+						unsigned long i0 = valtop();
 
-						unsigned long i1 = valpop() >> 16;
-						unsigned long i0 = valpop() >> 16;
-
-						valpush(TYPE_RANGE, (i0 << 16) | i1);
+						valput(TYPE_RANGE, (i0 & 0xffff0000ul) | (i1 >> 16));
 					}	break;
 				case TK_STRING:
 				case TK_BYTES:
@@ -1469,7 +1457,6 @@ bool interpret_expression(void)
 						for(char i=0; i<n; i++)
 						{
 							char ei = n - i - 1;
-							valderef(ei);
 							ei += esp;
 							__assume(ei < VALUE_STACK_SIZE);
 							mv->values[i] = estack[ei];
@@ -1487,7 +1474,6 @@ bool interpret_expression(void)
 						for(char i=0; i<n; i++)
 						{
 							char ei = n - i - 1;
-							valderef(ei);
 							ei += esp;
 							__assume(ei < VALUE_STACK_SIZE);
 							mv->values[i] = estack[ei];
@@ -1502,6 +1488,42 @@ bool interpret_expression(void)
 			} break;
 		default:
 			__assume(false);
+		}
+	}
+}
+
+void valderef(char at)
+{
+	char ei = esp + at;
+	__assume(ei < VALUE_STACK_SIZE);
+	if (estack[ei].type & TYPE_REF)
+	{
+		switch (estack[ei].type)
+		{
+		case TYPE_GLOBAL_REF:
+			estack[ei] = globals[(char)(estack[ei].value)];
+			break;
+		case TYPE_LOCAL_REF:
+			estack[ei] = estack[(char)(efp - estack[ei].value)];
+			break;
+		case TYPE_ARRAY_REF:
+			{
+				MemArray	*	ma = (MemArray *)(unsigned)estack[ei].value;
+				MemValues	*	mv = (MemValues *)ma->mh;
+				unsigned		mi = estack[ei].value >> 16;
+				estack[ei] = mv->values[mi];
+			} break;
+		case TYPE_STRUCT_REF:
+			{
+				MemDict		*	md = (MemDict *)(unsigned)estack[ei].value;
+				MemValues	*	mv = (MemValues *)md->mh;
+				unsigned		ms = estack[ei].value >> 16;
+				char			mi = struct_index(md, ms);
+				if (mi != 0xff)
+					estack[ei] = mv->values[mi];
+				else
+					estack[ei].type = TYPE_NULL;
+			} break;
 		}
 	}
 }
@@ -1655,7 +1677,6 @@ bool interpret_statement(void)
 		case STMT_RETURN_NULL:
 		case STMT_RETURN:
 			{
-				valderef(0);
 				csp = cfp;
 
 				char rsp = callstack[csp].esp;
@@ -1684,7 +1705,6 @@ bool interpret_statement(void)
 		{
 			esp--;
 			estack[esp] = estack[esp + 1];
-
 			valderef(1);
 			char t = estack[esp + 1].type;
 			if (t == TYPE_ARRAY)

@@ -144,7 +144,7 @@ char * parse_expression(const char * str, char * tk)
 	char	si = 0;
 	char 	c = str[si++];
 	char	ni = 0;
-	bool	prefix = true;
+	bool	prefix = true, qual = false;
 	for(;;)
 	{
 		switch (c)
@@ -197,7 +197,7 @@ char * parse_expression(const char * str, char * tk)
 			break;
 		case ':':
 			ni -= 2;
-			symlist[osp-1] = ((tk[ni] & 0x0f) << 16) | tk[ni + 1];
+			symlist[osp-1] = ((tk[ni] & 0x0f) << 8) | tk[ni + 1];
 			c = str[si++];
 			prefix = true;
 			break;
@@ -266,7 +266,10 @@ char * parse_expression(const char * str, char * tk)
 				c = str[si++];
 			}
 			else
+			{
 				ni = parse_op(tk, ni, TK_DOT);
+				qual = true;
+			}
 			prefix = true;
 			break;
 		case '!':
@@ -380,6 +383,15 @@ char * parse_expression(const char * str, char * tk)
 				ni += i + 2;
 				prefix = false;
 			} break;
+		case '_':
+		case 164:
+			if (!prefix)
+				return nullptr;
+			tk[ni++] = TK_NULL;
+			c = str[si++];
+			prefix = false;
+			break;
+
 		default:
 			if (is_letter(c))
 			{
@@ -396,9 +408,13 @@ char * parse_expression(const char * str, char * tk)
 				idbuf[j] = 0;
 
 				unsigned	id = symbol_add(idbuf);
-				tk[ni++] = (id >> 8) | TK_IDENT;
+				if (qual)
+					tk[ni++] = (id >> 8) | 8 | TK_IDENT;
+				else
+					tk[ni++] = (id >> 8) | TK_IDENT;
 				tk[ni++] = id & 0xff;
 				prefix = false;
+				qual = false;
 			}
 			else if (is_digit(c))
 			{
@@ -610,7 +626,7 @@ void parse_pretty(char * tk)
 			if (t == STMT_DEF)
 				lmin = lmax = 1;
 			else if (lmax > 1 && (t == STMT_ELSE || t == STMT_ELSIF))
-				lmin = lmax = lmax - 1;
+				lmax = lmax - 1;
 			
 			if (l < lmin)
 				l = lmin;

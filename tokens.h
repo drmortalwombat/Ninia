@@ -8,14 +8,14 @@
 // 0010 0000 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
 
 // ident
-// 0011 iiii iiii iiii
+// 0011 00ii iiii iiii
 
 // const
-// 0100 iiii iiii iiii
+// 0100 00ii iiii iiii
 // global
-// 0101 iiii iiii iiii
+// 0101 l0ii iiii iiii
 // local
-// 0110 iiii iiii iiii
+// 0110 l0ii iiii iiii
 
 // 1000 iiii binary operator
 // 1001 iiii relational operator
@@ -68,7 +68,7 @@
 
 #define TK_INDEX			(TK_POSTFIX + 0)
 #define TK_INVOKE			(TK_POSTFIX + 1)
-
+#define TK_LINDEX			(TK_POSTFIX + 2)
 
 #define TK_END				(TK_CONTROL + 0)
 #define TK_COMMA			(TK_CONTROL + 1)
@@ -80,6 +80,8 @@
 #define TK_STRUCT			(TK_CONTROL + 7)
 #define TK_BYTES			(TK_CONTROL + 8)
 #define TK_DOTDOT			(TK_CONTROL + 9)
+#define TK_LDOT				(TK_CONTROL + 10)
+#define TK_NULL				(TK_CONTROL + 11)
 
 #define STMT_END			0x00
 #define STMT_ERROR			0x01

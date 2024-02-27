@@ -1,0 +1,53 @@
+#insert an element into the tree
+»DEF treeins(t,k,v)
+ IF t
+  IF k==t.k
+   t.v=v
+   RETURN t
+  ELSIF k<t.k
+   t.l=treeins(t.l,k,v)
+   RETURN t
+  ELSE
+   t.r=treeins(t.r,k,v)
+   RETURN t
+ ELSE
+  RETURN {l:0,r:0,k:k,v:v}
+#find an element in the tree
+»DEF treefind(t,k)
+ IF t
+  IF k==t.k
+   RETURN t.v
+  ELSIF k<t.k
+   RETURN treefind(t.l,k)
+  ELSE
+   RETURN treefind(t.r,k)
+ RETURN
+
+»DEF sts(t,lp,cp,rp)
+ IF t
+  sts(t.l,lp+" ",lp+$75,lp+$62)
+  print(cp,t.k,":",t.v,"\n")
+  sts(t.r,rp+$62,rp+$6a,rp+" ")
+#print the tree
+»DEF treeshow(t)
+ sts(t,"","","")
+
+#!
+VAR t=0
+t=treeins(t,1,"one")
+t=treeins(t,4,"four")
+t=treeins(t,8,"eight")
+t=treeins(t,0,"zero")
+t=treeins(t,7,"seven")
+t=treeins(t,2,"two")
+t=treeins(t,3,"three")
+t=treeins(t,5,"five")
+t=treeins(t,6,"six")
+
+treeshow(t)
+
+FOR i=0..9
+ print("find ",i," : ",treefind(t,i),"\n")
+
+
+

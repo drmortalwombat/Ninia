@@ -127,7 +127,7 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 			{
 				stack[sp++] = si;
 				char tt = t & 0xf0;
-				unsigned id = ((t & 0x0f) << 8) | tk[ti++];
+				unsigned id = ((t & 0x03) << 8) | tk[ti++];
 				const char * ss;			
 				if (tt == TK_IDENT)
 					ss = symbol_string(id);
@@ -346,6 +346,13 @@ const char * format_expression(const char * tk, char * str, char * color, char s
 				si ++;
 				ti += 2 * n;
 			} break;
+
+			case TK_NULL:
+				stack[sp++] = si;
+				str[si] = '_';
+				color[si] = VCOL_MED_GREY;
+				si++;
+				break;
 
 			case TK_END:
 				str[si] = 0;

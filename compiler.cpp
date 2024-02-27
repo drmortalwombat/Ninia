@@ -3,6 +3,7 @@
 #include "tokens.h"
 #include "runtime.h"
 #include "manager.h"
+#include "errors.h"
 
 #pragma code(tcode)
 #pragma data(tdata)
@@ -46,18 +47,29 @@ unsigned local_add(unsigned symbol)
 
 char * prepare_expression(char * tk, bool var)
 {
+	char	tstack[32];
+	char	tsp = 0;
+
+	char	i = 0;
 	char 	t = *tk;
 	bool	left = true;
 	while (t != TK_END)
 	{
 		switch (t & 0xf0)
 		{
+		case TK_TINY_INT:
+			tstack[tsp++] = i;
+			i ++;
+			left = false;
+			break;
 		case TK_SMALL_INT:
-			tk += 2;
+			tstack[tsp++] = i;
+			i += 2;
 			left = false;
 			break;
 		case TK_NUMBER:
-			tk += 5;
+			tstack[tsp++] = i;
+			i += 5;
 			left = false;
 			break;
 
@@ -66,9 +78,11 @@ char * prepare_expression(char * tk, bool var)
 		case TK_GLOBAL:	
 		case TK_LOCAL:
 			{
+				tstack[tsp++] = i;
+
 				char tt = t & 0xf0;
-				unsigned ti = ((t & 0x0f) << 8) | tk[1];
-				if (tt == TK_IDENT)
+				unsigned ti = ((t & 0x03) << 8) | tk[i + 1];
+				if (tt == TK_IDENT && !(t & 8))
 				{
 					if (left && var)
 					{
@@ -81,80 +95,144 @@ char * prepare_expression(char * tk, bool var)
 					unsigned	vi = local_find(ti);
 					if (vi < num_locals)
 					{
-						tk[0] = (vi >> 8) | TK_LOCAL;
-						tk[1] = vi & 0xff;
+						tk[i + 0] = (vi >> 8) | TK_LOCAL;
+						tk[i + 1] = vi & 0xff;
 					}
 					else
 					{
 						vi = global_find(ti);
 						if (vi < num_globals)
 						{
-							tk[0] = (vi >> 8) | TK_GLOBAL;
-							tk[1] = vi & 0xff;
+							tk[i + 0] = (vi >> 8) | TK_GLOBAL;
+							tk[i + 1] = vi & 0xff;
 						}
 					}
 				}
-			tk += 2;
+			i += 2;
 			left = false;
 			}	break;
 
-		case TK_POSTFIX:
-			tk += 2;
+		case TK_RELATIONAL:
+		case TK_BINARY:
+			tsp -= 2;
+			tstack[tsp++] = i;
+			i++;
 			left = false;
 			break;
+
+		case TK_PREFIX:
+			tsp --;
+			tstack[tsp++] = i;
+			i++;
+			left = false;
+			break;
+
+		case TK_POSTFIX:
+			switch (t)
+			{
+			case TK_INDEX:
+				tsp -= 2;
+				break;
+			case TK_INVOKE:
+				tsp -= tk[i + 1] + 1;
+				break;
+			}
+
+			tstack[tsp++] = i;
+			i += 2;
+			left = false;
+			break;
+
+		case TK_ASSIGN:
+			{
+				tsp -= 2;
+				char j = tstack[tsp];
+				char tj = tk[j];
+				if (tj == TK_INDEX)
+					tk[j] = TK_LINDEX;
+				else if (tj == TK_DOT)
+					tk[j] = TK_LDOT;
+				else if ((tj & 0xf0) == TK_GLOBAL || (tj & 0xf0) == TK_LOCAL)
+					tk[j] |= 0x08;
+				else
+				{
+					runtime_error = RERR_INVALID_ASSIGN;
+					exectk = tk + i;
+				}
+				tstack[tsp++] = i;
+				i++;
+			}	break;
 
 		case TK_CONTROL:
 			{
 				switch (t)
 				{
 				case TK_COMMA:
-					tk++;
+					tstack[tsp++] = i;
+					i++;
 					left = true;
 					break;
 				case TK_STRING:
 				case TK_BYTES:
-					tk += tk[1] + 2;
+					tstack[tsp++] = i;
+					i += tk[i + 1] + 2;
+					left = false;
+					break;
+				case TK_DOTDOT:
+				case TK_DOT:
+					tsp -= 2;
+					tstack[tsp++] = i;
+					i++;
 					left = false;
 					break;
 				case TK_COLON:
-				case TK_DOT:
-				case TK_DOTDOT:
-					tk++;
+					i++;
 					left = false;
 					break;
 				case TK_LIST:
 				case TK_ARRAY:
-					tk += 2;
+					tsp -= tk[i + 1];
+					tstack[tsp++] = i;
+					i += 2;
 					left = false;
 					break;
 				case TK_STRUCT:
-					tk += 2 * tk[1] + 2;
+					tsp -= tk[i + 1];
+					tstack[tsp++] = i;
+					i += 2 * tk[i + 1] + 2;
 					left = false;
 					break;
+				case TK_NULL:
+					tstack[tsp++] = i;
+					i ++;
+					left = false;
+					break;
+
 				default:
-					tk++;
+					i++;
 				}
 			} break;
 
 		default:
-			tk++;
+			i++;
 			left = false;
 		}
-		t = *tk;
+		t = tk[i];
 	}
-	return tk + 1;
+
+	return tk + i + 1;
 }
 
 char * prepare_function(char * tk)
 {
-	unsigned ti = ((tk[0] & 0x0f) << 8) | tk[1];
+	unsigned ti = ((tk[0] & 0x03) << 8) | tk[1];
 	char vi = global_add(ti);
 
 	tk += 2;
 
 	while ((tk[0] & 0xf0) == TK_IDENT)
 	{
-		local_add(((tk[0] & 0x0f) << 8) | tk[1]);
+		local_add(((tk[0] & 0x03) << 8) | tk[1]);
 		tk += 2;
 	}
 
@@ -287,7 +365,7 @@ char * restore_expression(char * tk, bool var)
 		case TK_LOCAL:
 			{
 				char tt = t & 0xf0;
-				unsigned ti = ((t & 0x0f) << 8) | tk[1];
+				unsigned ti = ((t & 0x03) << 8) | tk[1];
 				if (tt == TK_GLOBAL)
 				{
 					unsigned vi = global_symbols[ti];
@@ -313,6 +391,9 @@ char * restore_expression(char * tk, bool var)
 			}	break;			
 
 		case TK_POSTFIX:
+			if (t == TK_LINDEX)
+				tk[0] = TK_INDEX;
+
 			tk += 2;
 			left = false;
 			break;
@@ -328,6 +409,11 @@ char * restore_expression(char * tk, bool var)
 				case TK_STRING:
 				case TK_BYTES:
 					tk += tk[1] + 2;
+					left = false;
+					break;
+				case TK_LDOT:
+					tk[0] = TK_DOT;
+					tk++;
 					left = false;
 					break;
 				case TK_COLON:
@@ -368,7 +454,7 @@ char * restore_function(char * tk)
 	char n = 0;
 	while ((tk[0] & 0xf0) == TK_IDENT)
 	{		
-		local_add(((tk[0] & 0x0f) << 8) | tk[1]);
+		local_add(((tk[0] & 0x03) << 8) | tk[1]);
 		tk += 2;
 		n++;
 	}
@@ -588,7 +674,7 @@ char * edit_line_to_token(unsigned y)
 	return tk;
 }
 
-char * tokens_file_load(char * tk)
+char * tokens_file_load(char * tk, bool import)
 {
 	krnio_chkin(2);
 
@@ -634,7 +720,11 @@ char * tokens_file_load(char * tk)
 			foldtk[3] = d >> 8;
 			foldtk = nullptr;
 		}
+		if (import && tk[1] == STMT_COMMENT && tk[3] == '!')
+			break;
+
 		tk = ntk;
+
 	}
 	krnio_clrchn();
 	krnio_close(2);
@@ -657,7 +747,7 @@ bool tokens_import(const char * name)
 		unsigned	esize = endtk - cursortk;
 		memmove(limittk - esize, cursortk, esize);
 
-		char * tk = tokens_file_load(cursortk);
+		char * tk = tokens_file_load(cursortk, true);
 
 		memmove(tk, limittk - esize, esize);
 		endtk = tk + esize;
@@ -682,7 +772,7 @@ bool tokens_load(const char * name)
 	{				
 		edit_init();
 
-		char * tk = tokens_file_load(starttk);
+		char * tk = tokens_file_load(starttk, false);
 
 		if (tk != starttk)
 		{
@@ -728,6 +818,8 @@ bool tokens_save(const char * name)
 					c -= p'A' - 'A';
 				else if (c >= p'a' && c <= p'z')
 					c += 'a' - p'a';
+				else if (c == 0xa0)
+					c = ' ';
 				krnio_chrout(c);
 				i++;
 			}

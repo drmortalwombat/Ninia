@@ -1,0 +1,41 @@
+DEF sprshow(s)
+ poke(53269,peek(53269)|(1<<s))
+
+DEF sprhide(s)
+ poke(53269,peek(53269)&!(1<<s))
+
+DEF sprmove(s,x,y)
+ VAR m=peek(53264)
+ IF x>=256
+  m=m|(1<<s)
+ ELSE
+  m=m&!(1<<s)
+ poke(53264,m,53248+2*s,x,53249+2*s,y)
+
+DEF sprimg(s,i)
+ poke(2040+s,i)
+
+DEF sprcolor(s,c)
+ poke(53287+s,c)
+
+DEF sprdef(i,m)
+ poke(64*i,m)
+
+sprdef(13,$00ff0003ffc00ffff01ffff83ffffc3ffffc7ffffe7ffffe7ffffeffffffffffff7ffffe7ffffe7ffffe3ffffc3ffffc1ffff80ffff003ffc000ff00)
+
+sprimg(0,13)
+sprshow(0)
+sprcolor(0,7)
+sprmove(0,100,100)
+
+VAR x=10,y=10,dx=2,dy=3
+
+WHILE 1
+ sprmove(0,x+24,y+50)
+ x+=dx
+ y+=dy
+ IF x<0|x>319
+  dx=-dx
+ IF y<0|y>199
+  dy=-dy
+
