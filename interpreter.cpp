@@ -1018,9 +1018,9 @@ void interpret_binop(char t)
 	}
 }
 
-bool interpret_expression(void)
+inline bool interpret_expression(void)
 {
-	const char * tk = exectk;
+//	const char * tk = exectk;
 	char tmp1[4], tmp2[4];
 
 	char	ti = 0;
@@ -1036,30 +1036,30 @@ bool interpret_expression(void)
 			valpush(TYPE_NUMBER, (unsigned long)(t & 0x0f) << 16);
 			break;
 		case TK_SMALL_INT:
-			valpush(TYPE_NUMBER, (unsigned long)(((t & 0x0f) << 8) | tk[ti++]) << 16);
+			valpush(TYPE_NUMBER, (unsigned long)(((t & 0x0f) << 8) | exectk[ti++]) << 16);
 			break;
 		case TK_NUMBER:
 		{
-			unsigned long l = tk[ti++];
+			unsigned long l = exectk[ti++];
 			l <<= 8;
-			l |= tk[ti++];
+			l |= exectk[ti++];
 			l <<= 8;
-			l |= tk[ti++];
+			l |= exectk[ti++];
 			l <<= 8;
-			l |= tk[ti++];
+			l |= exectk[ti++];
 			valpush(TYPE_NUMBER, l);
 		}	break;
 
 		case TK_IDENT:
 			{
-				unsigned tv = ((t & 0x03) << 8) | tk[ti++];
+				unsigned tv = ((t & 0x03) << 8) | exectk[ti++];
 				valpush(TYPE_SYMBOL, tv);
 			} break;
 		case TK_CONST:	
 			break;
 		case TK_LOCAL:
 			{
-				unsigned tv = ((t & 0x03) << 8) | tk[ti++];
+				unsigned tv = ((t & 0x03) << 8) | exectk[ti++];
 				if (t & 0x08)
 					valpush(TYPE_LOCAL_REF, tv);
 				else if (esp == 0)
@@ -1073,7 +1073,7 @@ bool interpret_expression(void)
 
 		case TK_GLOBAL:	
 			{
-				unsigned tv = ((t & 0x03) << 8) | tk[ti++];
+				unsigned tv = ((t & 0x03) << 8) | exectk[ti++];
 				if (t & 0x08)
 					valpush(TYPE_GLOBAL_REF, tv);
 				else if (esp == 0)
@@ -1111,8 +1111,8 @@ bool interpret_expression(void)
 							memcpy(dstr + 1 + s1[0], s2 + 1, s2[0]);
 							dstr[0] = s1[0] + s2[0];
 
-							esp += 2;
-							valpush(TYPE_STRING_HEAP, (unsigned)ms);
+							esp += 1;
+							valput(TYPE_STRING_HEAP, (unsigned)ms);
 						}
 					}
 					else if (typeget(0) == TYPE_ARRAY && typeget(1) == TYPE_ARRAY)
@@ -1134,8 +1134,8 @@ bool interpret_expression(void)
 							memcpy(mnv->values, mav->values, sizeof(Value) * ma->size);
 							memcpy(mnv->values + ma->size, mbv->values, sizeof(Value) * mb->size);
 
-							esp+=2;
-							valpush(TYPE_ARRAY, (unsigned)mn);
+							esp+=1;
+							valput(TYPE_ARRAY, (unsigned)mn);
 						}
 					}
 					else
@@ -1234,7 +1234,7 @@ bool interpret_expression(void)
 			{
 			case TK_LINDEX:
 				{
-					char n = tk[ti++];
+					char n = exectk[ti++];
 
 					char et = typeget(0);
 					long ei = valpop();
@@ -1251,7 +1251,7 @@ bool interpret_expression(void)
 
 			case TK_INDEX:
 				{
-					char n = tk[ti++];
+					char n = exectk[ti++];
 
 					char et = typeget(0);
 					long ei = valpop();
@@ -1336,7 +1336,7 @@ bool interpret_expression(void)
 
 			case TK_INVOKE:
 				{
-					char n = tk[ti++];
+					char n = exectk[ti++];
 
 					switch (typeget(n))
 					{
@@ -1348,7 +1348,7 @@ bool interpret_expression(void)
 							callstack[csp].efp = efp;
 							callstack[csp].esp = esp + n;
 							callstack[csp].cfp = cfp;
-							callstack[csp].tk = tk + ti;
+							callstack[csp].tk = exectk + ti;
 							callstack[csp].etk = execetk;
 							callstack[csp].type = CSTACK_CALL;
 							cfp = csp;
@@ -1366,6 +1366,9 @@ bool interpret_expression(void)
 							exectk += 3;
 							return false;
 						}
+					default:
+						runtime_error = RERR_INVALID_TYPES;	
+						break;						
 					}
 				}	break;
 			}	break;
@@ -1433,12 +1436,12 @@ bool interpret_expression(void)
 					}	break;
 				case TK_STRING:
 				case TK_BYTES:
-					valpush(TYPE_STRING_LITERAL, (unsigned)(tk + ti));
-					ti += tk[ti] + 1;
+					valpush(TYPE_STRING_LITERAL, (unsigned)(exectk + ti));
+					ti += exectk[ti] + 1;
 					break;
 				case TK_LIST:
 					{
-						char n = tk[ti++];
+						char n = exectk[ti++];
 						__assume(n < VALUE_STACK_SIZE);
 						if (n > 0)
 						{
@@ -1450,7 +1453,7 @@ bool interpret_expression(void)
 					} 	break;
 				case TK_ARRAY:
 					{
-						char n = tk[ti++];
+						char n = exectk[ti++];
 						__assume(n < VALUE_STACK_SIZE);
 						MemArray	*	ma = array_allocate(n, n);
 						MemValues	*	mv = (MemValues *)(ma + 1);
@@ -1466,9 +1469,9 @@ bool interpret_expression(void)
 					} break;
 				case TK_STRUCT:
 					{
-						char n = tk[ti];
+						char n = exectk[ti];
 						__assume(n < VALUE_STACK_SIZE);
-						MemDict		*	md = dict_allocate(tk + ti);
+						MemDict		*	md = dict_allocate(exectk + ti);
 						MemValues	*	mv = (MemValues *)(md->mh);
 
 						for(char i=0; i<n; i++)

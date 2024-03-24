@@ -591,7 +591,7 @@ char edit_text(void)
 			}
 			break;
 		case S'Y':
-			if (cursortk[1] != STMT_FOLD && cursortk[2] != STMT_END)
+			if (cursortk[1] != STMT_FOLD && (cursortk[1] != STMT_NONE || cursortk[2] != STMT_END))
 			{
 				marktk = nullptr;
 

@@ -1,0 +1,31 @@
+VAR aa=[1,7,6,4,5,2,8]
+
+DEF sort(a)
+ VAR i=0
+ WHILE i<len(a)
+  VAR j=i+1
+  WHILE j<len(a)
+   IF a[j]<a[i]
+    VAR t=a[i]
+    a[i]=a[j]
+    a[j]=t
+   j=j+1
+  i=i+1
+
+DEF pa(a)
+ VAR i=0
+ WHILE i<len(a)
+  IF i
+   print(",")
+  print(a[i])
+  i=i+1
+
+pa(aa)
+print("\n")
+sort(aa)
+pa(aa)
+print("\n")
+
+
+
+

@@ -1,0 +1,18 @@
+VAR f=fopen(9,0,"$")
+# skip basic load address
+fget(f,2)
+# get link byte
+VAR c=fget(f,2)
+WHILE #c>=2&asc(c[0])>0
+ c=fget(f,2)
+ VAR l=asc(c[0])+(asc(c[1])<<8)
+ print(l,":")
+ fget(f,$22)
+ VAR s=fget(f,$22)
+ s=s[0..#s-2]
+ print(s,"\n")
+ fget(f,$00)
+ c=fget(f,2)
+# and done
+fclose(f)
+
