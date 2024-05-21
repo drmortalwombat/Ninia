@@ -463,6 +463,18 @@ void interpret_builtin(char n)
 		valpush(TYPE_NULL, 0);
 		break;
 
+	case RTSYM_VSYNC:
+		if (n == 0)
+		{
+			vic_waitTop();
+			vic_waitBottom();
+			esp += 1;
+			valpush(TYPE_NULL, 0);
+		}
+		else
+			runtime_error = RERR_INVALID_ARGUMENTS;
+		break;
+
 	case RTSYM_POKE:
 		for(char i=0; i<n; i+=2)
 		{
@@ -965,6 +977,95 @@ void interpret_builtin(char n)
 					}
 					chp += 40;
 					cop += 40;
+				}
+			}
+
+			esp += 7;
+			valpush(TYPE_NULL, 0);
+		}
+		else
+			runtime_error = RERR_INVALID_ARGUMENTS;
+		break;
+	case RTSYM_CMOVE:
+		if (n == 6)
+		{
+			signed char sx = valget(5) >> 16, sy = valget(4) >> 16;
+			signed char w = valget(3) >> 16, h = valget(2) >> 16;
+			signed char dx = valget(1) >> 16, dy = valget(0) >> 16;
+
+			if (sx < 0)
+			{
+				w += sx;
+				dx += sx;
+				sx = 0;
+			}
+			if (sy < 0)
+			{
+				h += sy;
+				dy += sy;
+				sy = 0;
+			}
+			if (dx < 0)
+			{
+				w += dx;
+				sx += dx;
+				dx = 0;
+			}
+			if (dy < 0)
+			{
+				h += dy;
+				sy += dy;
+				dy = 0;
+			}
+
+			if (w > 0 && h > 0 && sx < 40 && sy < 25 && dx < 40 && dy < 25)
+			{
+				if (sx + w > 40) w = 40 - sx;
+				if (sy + h > 25) h = 25 - sy;
+				if (dx + w > 40) w = 40 - dx;
+				if (dy + h > 25) h = 25 - dy;			
+
+				if (dy < sy || dy == sy && dx < sx)
+				{
+					char * sbp = (char *)0x0400 + 40 * sy + sx;
+					char * scp = (char *)0xd800 + 40 * sy + sx;
+
+					char * dbp = (char *)0x0400 + 40 * dy + dx;
+					char * dcp = (char *)0xd800 + 40 * dy + dx;
+
+					for(char y=0; y<h; y++)
+					{
+						for(char x=0; x<w; x++)
+						{
+							dbp[x] = sbp[x];
+							dcp[x] = scp[x];
+						}
+						dbp += 40; sbp += 40;
+						dcp += 40; scp += 40;
+					}
+				}
+				else
+				{
+					sy += h;
+					dy += h;
+
+					char * sbp = (char *)0x0400 + 40 * sy + sx;
+					char * scp = (char *)0xd800 + 40 * sy + sx;
+
+					char * dbp = (char *)0x0400 + 40 * dy + dx;
+					char * dcp = (char *)0xd800 + 40 * dy + dx;
+
+					for(char y=0; y<h; y++)
+					{
+						dbp -= 40; sbp -= 40;
+						dcp -= 40; scp -= 40;
+
+						for(signed char x=w-1; x>=0; x--)
+						{
+							dbp[x] = sbp[x];
+							dcp[x] = scp[x];
+						}
+					}
 				}
 			}
 
@@ -1531,7 +1632,7 @@ void valderef(char at)
 	}
 }
 
-bool interpret_statement(void)
+inline bool interpret_statement(void)
 {
 	const char * tk = exectk;
 

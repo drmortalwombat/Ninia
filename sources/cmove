@@ -1,0 +1,19 @@
+cfill(2,2,32,16,81,7)
+cfill(3,3,30,14,32,0)
+
+FOR i=1..20
+ FOR j=1..4
+  cmove(0,0,40,25,1,0)
+  vsync()
+ FOR j=1..4
+  cmove(1,0,40,25,1,1)
+  vsync()
+ FOR j=1..4
+  cmove(1,1,40,25,0,1)
+  vsync()
+ FOR j=1..4
+  cmove(0,1,40,25,0,0)
+  vsync()
+
+
+

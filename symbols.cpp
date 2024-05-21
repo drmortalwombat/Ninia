@@ -18,7 +18,7 @@ const char *	rtsymbols[]  =
 	p"poke",
 	p"peek",
 
-	p"",
+	p"vsync",
 	p"cat",
 	p"chr",
 	p"shift",

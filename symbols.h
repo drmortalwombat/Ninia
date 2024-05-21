@@ -12,7 +12,7 @@
 #define RTSYM_POKE		0x04
 #define RTSYM_PEEK		0x05
 
-#define RTSYM_6			0x06
+#define RTSYM_VSYNC		0x06
 #define RTSYM_CAT		0x07
 #define RTSYM_CHR		0x08
 #define RTSYM_SHIFT		0x09

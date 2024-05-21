@@ -76,7 +76,7 @@ Structs are declared when created.  Members can be changed, but not added or rem
 	p.x += 10
 	print(p.x, " ", p.y, "\n")
 
-### Fucntions
+### Functions
 
 Functions can be declared with the def statement.  A function may exit once its block scope ends or a return statement is reached.  Parameters are always passed by value.  A function may return a struct if multiple return values are needed.
 
@@ -278,6 +278,10 @@ Fill a rectangle of characters a at location x, y with color c on screen.
 
 #### cmove
 
+	cfill(dx,dy,w,h,sx,sy)
+	
+Move a rectangle of characters from location sx, sy to location dx, dy on screen.
+
 ### System builtins
 
 #### poke
@@ -297,6 +301,12 @@ Read a value from a memory location.
 	var t = time()
 	
 Get the number of seconds since system startup.
+
+#### vsync
+
+	vsync()
+	
+Wait for the raster beam to reach the bottom of the visible screen area.
 
 
 ## Tokenization
