@@ -1,6 +1,7 @@
 #include "errors.h"
 
 #pragma code( ecode )
+#pragma data( edata )
 
 const char * const runtime_error_names[NUM_ERRORS] =
 {

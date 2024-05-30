@@ -2,6 +2,7 @@
 #include <string.h>
 #include <c64/memmap.h>
 #include <c64/vic.h>
+#include <c64/sid.h>
 #include <c64/easyflash.h>
 
 #pragma stacksize( 1024 )
@@ -63,6 +64,7 @@ int main(void)
 }
 
 static char * const Font = (char *)0xd000;
+static char * const Sprites = (char *)0xd800;
 
 struct FontPatch
 {
@@ -174,6 +176,9 @@ void system_show_editor(void)
 			dp1[j] = ~sp[j];
 		}
 	}
+	memset(Sprites, 0, 64);
+	for(char i=0; i<10; i++)
+		Sprites[3 * i] = 0xe0;
 	mmap_set(MMAP_ROM);
 	__asm
 	{
@@ -182,9 +187,20 @@ void system_show_editor(void)
 
 	vic_setmode(VICM_TEXT, Screen, Font);
 
+	Screen[0x3f8] = 96;
+	vic.spr_enable = 0;
+	vic.spr_multi = 0;
+	vic.spr_expand_x = 0;
+	vic.spr_expand_y = 0;
+	vic.spr_color[0] = VCOL_WHITE;
+	vic.spr_priority = 1;
+	vic.spr_pos[0].y = 0;
+	vic.spr_pos[0].x = 0;
+	vic.spr_msbx = 0;
+
 	vic.color_border = VCOL_BLACK;
 	vic.color_back = VCOL_BLACK;	
-	vic.spr_enable = 0;
+	sid.fmodevol = 0;
 }
 
 void system_show_runtime(void)

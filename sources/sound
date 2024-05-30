@@ -1,0 +1,51 @@
+VAR sid=54272
+VAR vic=53248
+
+#change volume
+DEF vol(v)
+ poke(sid+24,v)
+
+#play a sound with given attributes
+DEF sound(g,freq,gen,att,dec,sus,rel)
+ VAR a=sid+7*g
+ poke(a,freq,a+1,freq>>8,a+5,(att<<4)|dec,a+6,(sus<<4)|rel,a+4,gen)
+
+#change frequency of current sound
+DEF sfreq(g,freq)
+ VAR a=sid+7*g
+ poke(a,freq,a+1,freq>>8)
+
+#change generator of current sound
+DEF sgen(g,gen)
+ VAR a=sid+7*g
+ poke(a+4,gen)
+
+VAR notes=[16744,17740,18794,19912,21096,22351,23680,25087,26580,28160,29834,31068]
+VAR octs=[0.0312,0.0625,0.125,0.25,0.5,1]
+
+#calculate frequency of a note
+DEF tune(n,o)
+ RETURN notes[n]*octs[o]
+
+vol(15)
+FOR i=0..10
+ sound(0,tune(i,2),33,0,0,15,8)
+ sound(1,tune(i,3),33,0,0,15,8)
+ FOR j=0..2
+  vsync()
+ sgen(0,32)
+ sgen(1,32)
+ FOR j=0..4
+  vsync()
+
+FOR i=0..11
+ sound(0,tune(11-i,2),33,0,0,15,8)
+ sound(1,tune(11-i,3),33,0,0,15,8)
+ FOR j=0..2
+  vsync()
+ sgen(0,32)
+ sgen(1,32)
+ FOR j=0..4
+  vsync()
+
+

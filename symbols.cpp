@@ -8,8 +8,9 @@ struct Symbol
 }	symbols[NUM_SYMBOLS];
 
 #pragma code(tcode)
+#pragma data(tdata)
 
-const char *	rtsymbols[]  =
+const char *	const rtsymbols[]  =
 {
 	p"abs",
 	p"rand",

@@ -1,0 +1,25 @@
+DEF color(bk,br)
+ poke(53280,br,53281,bk)
+
+DEF box(x,y,w,h,c)
+ cput(x,y,112,c)
+ cfill(x+1,y,w-2,1,67,c)
+ cput(x+w-1,y,110,c)
+ cfill(x,y+1,1,h-1,66,c)
+ cfill(x+1,y+1,w-2,h-2,160,c)
+ cfill(x+w-1,y+1,1,h-1,66,c)
+ cput(x,y+h-1,109,c)
+ cfill(x+1,y+h-1,w-2,1,67,c)
+ cput(x+w-1,y+h-1,125,c)
+
+color(0,12)
+FOR i=1..1000
+ VAR x=floor(rand()*30)
+ VAR y=floor(rand()*15)
+ VAR w=floor(rand()*(35-x)+5)
+ VAR h=floor(rand()*(22-y)+3)
+ box(x,y,w,h,i)
+ cmove(0,1,40,24,0,0)
+ cfill(0,24,40,1,32,0)
+
+

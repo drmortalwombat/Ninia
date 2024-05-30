@@ -1,4 +1,5 @@
 #include <c64/vic.h>
+#include <c64/asm6502.h>
 #include "manager.h"
 #include <conio.h>
 #include "editor.h"
@@ -113,7 +114,8 @@ const char manager_main_menu[] =
 	p"Dri_ve\t"
 	p"_Directory\t"
 	p"De_lete\t"
-	p"_Return\n";
+	p"_Return\n"
+	p"_Quit\n";
 
 void manager_menu(char y, const char * msg)
 {
@@ -313,9 +315,9 @@ void manager_build(const char * name)
 	SYS_VPCALL(prepare_statements, starttk);
 
 	char	xname[32];
-	strcpy(xname, "@0:");
-	strcat(xname, name);
-	strcat(xname, ",P,W");
+	char i = strbld(xname, "@0:", 0);
+	i = strbld(xname, name, i);
+	i = strbld(xname, ",P,W", i);
 
 	krnio_setnam(xname);
 	if (krnio_open(2, sysdrive, 2))
@@ -422,6 +424,19 @@ void manager_invoke(void)
 			break;
 		case p'r':
 			return;
+		case p'q':
+			if (!tkmodified || manager_are_you_sure())
+			{
+				char * rb = (char *)0x0400;
+				rb += asm_np(rb, ASM_SEI);
+				rb += asm_im(rb, ASM_LDA, 0x04);
+				rb += asm_ab(rb, ASM_STA, 0xde02);
+				rb += asm_ab(rb, ASM_JMP, 0xfce2);
+				__asm {
+					jmp $0400
+				}
+			}
+			break;
 		}
 	}
 }

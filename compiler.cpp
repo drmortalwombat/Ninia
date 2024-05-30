@@ -736,9 +736,9 @@ char * tokens_file_load(char * tk, bool import)
 bool tokens_import(const char * name)
 {
 	char	xname[32];
-	strcpy(xname, "0:");
-	strcat(xname, name);
-	strcat(xname, ",P,R");
+	char i = strbld(xname, "0:", 0);
+	i = strbld(xname, name, i);
+	i = strbld(xname, ",P,R", i);
 
 	krnio_setnam(xname);
 	if (krnio_open(2, sysdrive, 2))
@@ -763,9 +763,9 @@ bool tokens_import(const char * name)
 bool tokens_load(const char * name)
 {
 	char	xname[32];
-	strcpy(xname, "0:");
-	strcat(xname, name);
-	strcat(xname, ",P,R");
+	char i = strbld(xname, "0:", 0);
+	i = strbld(xname, name, i);
+	i = strbld(xname, ",P,R", i);
 
 	krnio_setnam(xname);
 	if (krnio_open(2, sysdrive, 2))
@@ -791,9 +791,9 @@ bool tokens_load(const char * name)
 bool tokens_save(const char * name)
 {
 	char	xname[32];
-	strcpy(xname, "@0:");
-	strcat(xname, name);
-	strcat(xname, ",P,W");
+	char i = strbld(xname, "@0:", 0);
+	i = strbld(xname, name, i);
+	i = strbld(xname, ",P,W", i);
 
 	krnio_setnam(xname);
 	if (krnio_open(2, sysdrive, 2))

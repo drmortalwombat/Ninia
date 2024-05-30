@@ -278,7 +278,7 @@ Fill a rectangle of characters a at location x, y with color c on screen.
 
 #### cmove
 
-	cfill(dx,dy,w,h,sx,sy)
+	cfill(sx,sy,w,h,dx,dy)
 	
 Move a rectangle of characters from location sx, sy to location dx, dy on screen.
 

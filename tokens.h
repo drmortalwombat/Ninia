@@ -145,6 +145,7 @@ bool is_digit(char c);
 
 bool is_hex(char c);
 
+char strbld(char * dp, const char * sp, char n);
 
 const char * number_format(unsigned long l, bool sign);
 

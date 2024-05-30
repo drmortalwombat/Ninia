@@ -80,7 +80,7 @@ bool is_hex(char c)
 }
 
 
-unsigned long fscale[8] = {
+__striped unsigned long fscale[8] = {
 	858993459,
 	85899345,
 	8589934,
@@ -112,7 +112,7 @@ char number_parse(const char * str, char n, long & lr)
 		i++;
 	}
 
-	lr = (long)num << 16;
+	unsigned long llr = (long)num << 16;
 	if (i < n && str[i] == '.' && str[i + 1] != '.')
 	{
 
@@ -127,12 +127,24 @@ char number_parse(const char * str, char n, long & lr)
 			i++;
 		} 
 		if (k > 0)
-			lr += (unsigned long)(lmul16f16s(fract, fscale[k - 1]) + 1) >> 1;
+			llr += (unsigned long)(lmul16f16s(fract, fscale[k - 1]) + 1) >> 1;
 	}
 
 	if (sign)
-		lr = -lr;
+		lr = -llr;
+	else
+		lr = llr;
 
 	return i;
 }
+
+char strbld(char * dp, const char * sp, char n)
+{
+	char i = 0;
+	while (sp[i])
+		dp[n++] = sp[i++];
+	dp[n] = 0;
+	return n;
+}
+
 

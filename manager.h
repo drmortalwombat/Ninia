@@ -6,8 +6,8 @@
 extern edit_cmd_t	filename;
 extern char			sysdrive;
 
-void manager_init(void);
+__noinline void manager_init(void);
 
-void manager_invoke(void);
+__noinline void manager_invoke(void);
 
 #pragma compile("manager.cpp")

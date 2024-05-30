@@ -70,6 +70,8 @@ const char * edit_display_line(char y, const char * tk)
 	while (i < screenx && buffer[i])
 		i++;
 
+	__assume(y < 25);
+
 	char * dp = Screen + 40 * y;
 	char * cp = Color + 40 * y;
 
@@ -203,6 +205,8 @@ char edit_line(void)
 		i++;
 	}
 
+	__assume(cursory < 25);
+
 	char * dp = Screen + 40 * cursory;
 	char * cp = Color + 40 * cursory;
 
@@ -219,19 +223,28 @@ char edit_line(void)
 		uptk = screentk;
 	}
 
+	char ccount = 0;
+	bool modified = false;
 	for(;;)
 	{
-		dp[cursorx - screenx] |= 0x80;
+		vic_sprxy(0, 23 + 8 * (cursorx - screenx), 49 + 8 * cursory);
 
-		char ch;
-		if (upy != 24)
-			ch = system_getchx();
-		else
-			ch = system_getch();
+		char ch = system_getchx();
+		if (!ch && upy == 24)
+		{
+			vic_waitFrame();
+			ccount++;
+			if (ccount == 16)
+			{
+				vic.spr_color[0] ^= 10;
+				ccount = 0;
+			}
+		}
 
 		if (ch)
 		{
-			dp[cursorx - screenx] &= ~0x80;
+			vic.spr_color[0] = 1;
+			ccount = 0;
 
 			bool	redraw = false;
 
@@ -281,6 +294,7 @@ char edit_line(void)
 						i++;
 					}
 					tkmodified = true;
+					modified = true; 
 					redraw = true;
 					ch = 0;
 				}
@@ -318,6 +332,7 @@ char edit_line(void)
 					ecbuffer[i] = VCOL_WHITE;
 					cursorx++;
 					tkmodified = true;
+					modified = true; 
 					redraw = true;
 				}
 				ch = 0;
@@ -326,46 +341,50 @@ char edit_line(void)
 
 			if (ch)
 			{
-				i = edit_length();
-				ebuffer[i] = 0;
-
-				int nsz = SYS_RPCALL2(parse_statement, (char *)ebuffer, (char *)buffer) - buffer;
-
 				if (ch == PETSCII_RETURN)
+					modified = true;
+
+				if (modified)
 				{
-					if (upy > cursory)
+					i = edit_length();
+					ebuffer[i] = 0;
+
+					int nsz = SYS_RPCALL2(parse_statement, (char *)ebuffer, (char *)buffer) - buffer;
+
+					if (ch == PETSCII_RETURN)
 					{
-						upy = cursory;
-						uptk = cursortk;
+						if (upy > cursory)
+						{
+							upy = cursory;
+							uptk = cursortk;
+						}
+
+						if (cursorx < buffer[0])
+						{
+							cursortk[0] = buffer[0];
+							cursortk[1] = STMT_NONE;
+							cursortk += 2;
+							cursory++;
+							psz-=2;
+							ch = ' ';
+						}
+						else
+						{
+							buffer[nsz++] = buffer[0];
+							buffer[nsz++] = STMT_NONE;							
+						}
 					}
 
-					if (cursorx < buffer[0])
-					{
-						cursortk[0] = buffer[0];
-						cursortk[1] = STMT_NONE;
-						cursortk += 2;
-						cursory++;
-						psz-=2;
-						ch = ' ';
-					}
-					else
-					{
-						buffer[nsz++] = buffer[0];
-						buffer[nsz++] = STMT_NONE;							
-					}
-				}
-				else
-				{
-					if (upy < 24 && upy > cursory)
-					{
-						upy = cursory;
-						uptk = cursortk;
-					}
-				}
+					memmove(cursortk + nsz, cursortk + psz, endtk - (cursortk + psz));
+					memcpy(cursortk, buffer, nsz);
+					endtk += nsz - psz;
+				}				
 
-				memmove(cursortk + nsz, cursortk + psz, endtk - (cursortk + psz));
-				memcpy(cursortk, buffer, nsz);
-				endtk += nsz - psz;
+				if (upy < 24 && upy > cursory)
+				{
+					upy = cursory;
+					uptk = cursortk;
+				}
 
 				if (upy > cursory)
 					edit_display_line(cursory, cursortk);
@@ -506,6 +525,7 @@ char edit_text(void)
 {
 	bool	redraw = true;
 
+	vic.spr_enable = 1;
 	for(;;)
 	{
 		if (redraw)
@@ -516,10 +536,9 @@ char edit_text(void)
 		char ch;
 		if (cursortk[1] == STMT_FOLD)
 		{
-			char * dp = Screen + 40 * cursory;
-			dp[0] ^= 0x80;
+			__assume(cursory < 25);
+			vic_sprxy(0, 24, 49 + 8 * cursory);
 			ch = system_getch();
-			dp[0] ^= 0x80;
 		}
 		else
 			ch = edit_line();
@@ -704,6 +723,7 @@ char edit_text(void)
 		case PETSCII_F2:
 		case PETSCII_F5:
 		case PETSCII_F7:
+			vic.spr_enable = 0;
 			return ch;
 		}
 

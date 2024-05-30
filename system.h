@@ -60,7 +60,7 @@ char system_getchx(void);
 
 char system_readch(void);
 
-char system_bank_read(char back, char bank, volatile const char * p);
+__noinline char system_bank_read(char back, char bank, volatile const char * p);
 
 template<int back, class fn>
 __noinline void system_vcall(void)

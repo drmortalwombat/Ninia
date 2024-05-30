@@ -42,7 +42,7 @@
 
 #pragma code(tcode)
 
-void symbols_init(void);
+__noinline void symbols_init(void);
 
 unsigned symbol_add(const char * s);
 
