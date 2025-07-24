@@ -1,0 +1,16 @@
+print("NHL\n")
+
+VAR start=time()
+VAR s
+
+FOR i=1..10
+ s=0
+ FOR j=1..1000
+  s=s+j
+
+VAR end=time()
+
+print("S: ",s)
+print("TIME: ",end-start)
+
+

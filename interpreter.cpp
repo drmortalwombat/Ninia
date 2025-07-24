@@ -66,7 +66,6 @@ void interpret_reset(void)
 	filemask = 0;
 }
 
-
 char struct_index(MemDict * md, unsigned sym)
 {
 	char sz = md->symbols[0];
@@ -111,6 +110,13 @@ inline char typeget(char at)
 
 inline void valput(char type, long value)
 {
+	estack[esp].type = type;
+	estack[esp].value = value;	
+}
+
+inline void valret(char n, char type, long value)
+{
+	esp += n;
 	estack[esp].type = type;
 	estack[esp].value = value;	
 }
@@ -380,11 +386,7 @@ void interpret_builtin(char n)
 	{
 	case RTSYM_ABS:
 		if (n == 1)
-		{
-			long li = valpop();
-			esp += 1;
-			valpush(TYPE_NUMBER, labs(li));
-		} 
+			valret(1, TYPE_NUMBER, labs(valtop()));
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
 		break;
@@ -396,10 +398,7 @@ void interpret_builtin(char n)
 		break;
 	case RTSYM_RAND:
 		if (n == 0)
-		{
-			esp += 1;
-			valpush(TYPE_NUMBER, urand());
-		}
+			valret(0, TYPE_NUMBER, urand());
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
 		break;
@@ -407,8 +406,7 @@ void interpret_builtin(char n)
 		if (n == 0)
 		{
 			long l = clock();
-			esp += 1;
-			valpush(TYPE_NUMBER, lmul16f16s(l, 0x04444444l));
+			valret(0, TYPE_NUMBER, lmul16f16s(l, 0x04444444l));
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
@@ -417,8 +415,7 @@ void interpret_builtin(char n)
 		if (n == 0)
 		{
 			char ch = system_getchx();
-			esp += 1;
-			valpush(TYPE_NUMBER, (long)ch << 16);
+			valret(0, TYPE_NUMBER, (long)ch << 16);
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
@@ -459,8 +456,7 @@ void interpret_builtin(char n)
 				} break;
 			}
 		}
-		esp += n + 1;
-		valpush(TYPE_NULL, 0);
+		valret(n, TYPE_NULL, 0);
 		break;
 
 	case RTSYM_VSYNC:
@@ -468,8 +464,7 @@ void interpret_builtin(char n)
 		{
 			vic_waitTop();
 			vic_waitBottom();
-			esp += 1;
-			valpush(TYPE_NULL, 0);
+			valret(0, TYPE_NULL, 0);
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
@@ -496,16 +491,14 @@ void interpret_builtin(char n)
 				} break;
 			}
 		}
-		esp += n + 1;
-		valpush(TYPE_NULL, 0);
+		valret(n, TYPE_NULL, 0);
 		break;
 
 	case RTSYM_PEEK:
 		if (n == 1)
 		{
 			volatile char * lp = (char *)((unsigned long)valpop() >> 16);
-			esp += 1;
-			valpush(TYPE_NUMBER, (long)*lp << 16);
+			valret(0, TYPE_NUMBER, (long)*lp << 16);
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
@@ -683,9 +676,8 @@ void interpret_builtin(char n)
 	case RTSYM_FLOOR:
 		if (n == 1)
 		{
-			long li = valpop() & 0xffff0000ul;
-			esp += 1;
-			valpush(TYPE_NUMBER, li);
+			long li = valtop() & 0xffff0000ul;
+			valret(1, TYPE_NUMBER, li);
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
@@ -694,9 +686,8 @@ void interpret_builtin(char n)
 	case RTSYM_CEIL:
 		if (n == 1)
 		{
-			long li = (valpop() + 0xffff) & 0xffff0000ul;
-			esp += 1;
-			valpush(TYPE_NUMBER, li);
+			long li = (valtop() + 0xffff) & 0xffff0000ul;
+			valret(1, TYPE_NUMBER, li);
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
@@ -925,8 +916,7 @@ void interpret_builtin(char n)
 				*(char *)(0xd800 + o) = co;
 			}
 
-			esp += 5;
-			valpush(TYPE_NULL, 0);
+			valret(4, TYPE_NULL, 0);
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
@@ -943,8 +933,7 @@ void interpret_builtin(char n)
 				ch = *(char *)(0x0400 + o);
 			}
 
-			esp += 3;
-			valpush(TYPE_NUMBER, long(ch) << 16);
+			valret(2, TYPE_NUMBER, long(ch) << 16);
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
@@ -980,8 +969,7 @@ void interpret_builtin(char n)
 				}
 			}
 
-			esp += 7;
-			valpush(TYPE_NULL, 0);
+			valret(6, TYPE_NULL, 0);
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;
@@ -996,25 +984,25 @@ void interpret_builtin(char n)
 			if (sx < 0)
 			{
 				w += sx;
-				dx += sx;
+				dx -= sx;
 				sx = 0;
 			}
 			if (sy < 0)
 			{
 				h += sy;
-				dy += sy;
+				dy -= sy;
 				sy = 0;
 			}
 			if (dx < 0)
 			{
 				w += dx;
-				sx += dx;
+				sx -= dx;
 				dx = 0;
 			}
 			if (dy < 0)
 			{
 				h += dy;
-				sy += dy;
+				sy -= dy;
 				dy = 0;
 			}
 
@@ -1069,8 +1057,7 @@ void interpret_builtin(char n)
 				}
 			}
 
-			esp += 7;
-			valpush(TYPE_NULL, 0);
+			valret(6, TYPE_NULL, 0);
 		}
 		else
 			runtime_error = RERR_INVALID_ARGUMENTS;

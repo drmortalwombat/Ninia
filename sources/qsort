@@ -1,0 +1,24 @@
+DEF qsort(a)
+ IF #a>1
+  VAR p=a[0],j=0
+  FOR i=1..#a-1
+   IF a[i]<p
+    a[j]=a[i]
+    j+=1
+    a[i]=a[j]
+  RETURN qsort(a[0..j-1])+[p]+qsort(a[j+1..#a-1])
+ ELSE
+  RETURN a
+
+DEF parray(a)
+ FOR i=a
+  print(i," ")
+ print("\n")
+
+VAR b=["this","is","a","list","to","be","sorted"]
+parray(b)
+
+b=qsort(b)
+
+parray(b)
+
