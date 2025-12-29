@@ -686,7 +686,7 @@ char edit_text(void)
 			redraw = true;
 			break;
 		case PETSCII_F6:
-			parse_pretty(starttk);
+			SYS_VPCALL(parse_pretty, starttk);
 			redraw = true;
 			break;
 		case PETSCII_F1:
